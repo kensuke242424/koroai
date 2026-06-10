@@ -338,7 +338,9 @@ struct HomeView: View {
         .padding(.leading, 20)
         .padding(.trailing, 16)
         .padding(.top, 8)
-        .padding(.bottom, 8)
+        // 設定ボタン（44pt 枠）とメタ行（44pt チップ）が縦に並ぶため、
+        // バンド間が間延びしないようここは詰める（デザインの密度に合わせる）。
+        .padding(.bottom, 2)
         .background(tokens.bg)
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -351,6 +353,21 @@ struct HomeView: View {
     // MARK: - スクロール本体
 
     private var scrollBody: some View {
+        ScrollViewReader { proxy in
+            scrollContent
+                #if DEBUG
+                .onAppear {
+                    // スクショ用: -scrollHome でコンテンツ先頭（今週の食材あたり）までスクロールした状態にする。
+                    guard CommandLine.arguments.contains("-scrollHome") else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        withAnimation { proxy.scrollTo("homeScrollTarget", anchor: .top) }
+                    }
+                }
+                #endif
+        }
+    }
+
+    private var scrollContent: some View {
         ScrollView {
             // スクロール量をオフセットで取得（iOS 17 互換 PreferenceKey）
             GeometryReader { geo in
@@ -383,8 +400,12 @@ struct HomeView: View {
         }
         .coordinateSpace(name: "homeScroll")
         .onPreferenceChange(ScrollOffsetKey.self) { y in
-            if abs(scrollY - y) > 1 { scrollY = y }
+            // iOS 17 用フォールバック。iOS 18+ は onScrollGeometryChange（下の modifier）で取得する。
+            if #unavailable(iOS 18.0) {
+                if abs(scrollY - y) > 1 { scrollY = y }
+            }
         }
+        .modifier(ScrollOffsetObserver(scrollY: $scrollY))
     }
 
     // ScrollView 内で sticky にするため LazyVStack(pinnedViews) を使う構成へ。
@@ -414,6 +435,7 @@ struct HomeView: View {
                         },
                         onRecipe: { toast.show(.toss, "準備中です") } // ユーザー決定: レシピは準備中
                     )
+                    .id("homeScrollTarget") // -scrollHome 検証フックのスクロール先
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
@@ -435,8 +457,9 @@ struct HomeView: View {
             digestChip
         }
         .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 10)
+        // チップ自体が 44pt の縦寸を持つため、上下 padding は最小限にして帯間を詰める。
+        .padding(.top, 2)
+        .padding(.bottom, 6)
         .background(tokens.bg)
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -652,6 +675,26 @@ private struct ScrollOffsetKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+// MARK: - スクロールオフセット監視（iOS 18+）
+
+/// iOS 18+ では onScrollGeometryChange でオフセットを取る（PreferenceKey 方式が
+/// 新しい OS で更新されないことがあるため）。iOS 17 は PreferenceKey フォールバック。
+private struct ScrollOffsetObserver: ViewModifier {
+    @Binding var scrollY: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, newValue in
+                if abs(scrollY - newValue) > 0.5 { scrollY = newValue }
+            }
+        } else {
+            content
+        }
     }
 }
 

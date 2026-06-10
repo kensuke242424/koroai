@@ -48,6 +48,8 @@ struct AddSheet: View {
     @Environment(\.modelContext) private var context
 
     @State private var model = AddFlowModel()
+    /// 詳細入力パネルの内容高さ（コンテンツフィット用に測る）。
+    @State private var detailContentHeight: CGFloat = 0
 
     private var copy: ToneCopy { store.tone.copy }
 
@@ -67,8 +69,6 @@ struct AddSheet: View {
             detailOverlay
             confirmCloseOverlay
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.view)
-        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.confirmClose)
         .onChange(of: isPresented) { _, presented in
             if presented {
                 model.reset()
@@ -392,27 +392,43 @@ struct AddSheet: View {
 
     // MARK: - 詳細オーバーレイ
 
-    @ViewBuilder
+    /// 詳細入力のトップモーダル。
+    /// SheetContainer と同じ構造（常設 ZStack に if ＋ transition、.animation を直接付与）に
+    /// しないと insertion/removal がフェードに化けるので注意。
     private var detailOverlay: some View {
-        if model.view == .detail {
+        GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                // スクリム（タップで grid へ戻る）。トップモーダルとして背後の全 View
-                // （ホーム＋カテゴリ選択シート）を画面全体でマスクする。
-                Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.30)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .onTapGesture { model.view = .grid }
-                detailPanel
-                    .transition(.move(edge: .bottom))
+                if model.view == .detail {
+                    // スクリム（タップで grid へ戻る）。トップモーダルとして背後の全 View
+                    // （ホーム＋カテゴリ選択シート）を画面全体でマスクする。
+                    Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.30)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                        .onTapGesture { model.view = .grid }
+                    detailPanel(maxHeight: geo.size.height * 0.94)
+                        .transition(.move(edge: .bottom))
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.view)
         }
+        .allowsHitTesting(model.view == .detail)
     }
 
-    private var detailPanel: some View {
+    /// パネル高さは内容にフィットさせる（maxHeight 94% まで。プロトタイプの maxHeight: '94%' 相当）。
+    /// 全高に広げると内容の下に大きな余白ができるため、内容高さを測って frame を絞る。
+    private func detailPanel(maxHeight: CGFloat) -> some View {
         ScrollView {
             DetailForm(model: model, isEditing: model.editingId != nil)
+                .background(
+                    GeometryReader { g in
+                        Color.clear.preference(key: DetailContentHeightKey.self, value: g.size.height)
+                    }
+                )
         }
-        .frame(maxHeight: .infinity)
+        .onPreferenceChange(DetailContentHeightKey.self) { detailContentHeight = $0 }
+        .frame(height: detailContentHeight > 0 ? min(detailContentHeight, maxHeight) : nil)
+        .frame(maxHeight: maxHeight)
         .background {
             // 背景はホームインジケータ領域まで延長（SheetContainer と同じ扱い）。
             UnevenRoundedRectangle(
@@ -423,16 +439,15 @@ struct AddSheet: View {
             .fill(tokens.bg2)
             .ignoresSafeArea(edges: .bottom)
         }
-        .padding(.top, 40)
     }
 
     // MARK: - 閉じる確認オーバーレイ
 
-    @ViewBuilder
+    /// 閉じる確認のトップモーダル（detailOverlay と同じ常設 ZStack 構造）。
     private var confirmCloseOverlay: some View {
-        if model.confirmClose {
-            let n = model.cartCount
-            ZStack(alignment: .bottom) {
+        ZStack(alignment: .bottom) {
+            if model.confirmClose {
+                let n = model.cartCount
                 Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28)
                     .ignoresSafeArea()
                     .transition(.opacity)
@@ -491,6 +506,9 @@ struct AddSheet: View {
                 .transition(.move(edge: .bottom))
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.confirmClose)
+        .allowsHitTesting(model.confirmClose)
     }
 
     // MARK: - 閉じる制御
@@ -503,5 +521,14 @@ struct AddSheet: View {
         if model.requestClose() {
             isPresented = false
         }
+    }
+}
+
+// MARK: - 詳細パネルの内容高さ計測用 PreferenceKey
+
+private struct DetailContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
