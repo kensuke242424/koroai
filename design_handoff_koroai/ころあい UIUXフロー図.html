@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ころあい — UX フロー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#ece7dc; --paper:#ffffff; --screen:#f5f0e6; --surface:#fffdf8; --surface2:#efe7d6;
+    --text:#3a342b; --sec:#7c7363; --ter:#b3aa98;
+    --green:#6f8f6a; --greenSoft:#e7eedd; --ink:#41614a; --inkDk:#35513d; --greenLt:#8fae87;
+    --tc:#b8604a; --tcDk:#9e4d3a; --tcSoft:#f3dcd4;
+    --blue:#5f93a2; --gold:#caa14a; --goldSoft:#f1e6c8;
+    --hair:rgba(70,55,30,0.10); --hair2:rgba(70,55,30,0.16);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;font-family:"M PLUS Rounded 1c",system-ui,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;
+    background:var(--bg);
+    background-image:linear-gradient(rgba(70,55,30,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(70,55,30,0.04) 1px,transparent 1px);
+    background-size:34px 34px;}
+  .page{padding:40px 24px 70px;}
+  .heading{max-width:1480px;margin:0 auto 18px;}
+  .heading h1{margin:0 0 10px;font-size:40px;font-weight:800;letter-spacing:.5px;}
+  .heading .path{display:flex;align-items:center;gap:12px;font-size:21px;font-weight:700;color:var(--ter);}
+  .heading .sub{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:15px;font-weight:700;color:var(--sec);}
+  .heading .sub .grip{color:var(--ter);letter-spacing:2px;}
+  .scaleZone{max-width:1480px;margin:0 auto;overflow:hidden;}
+  #sheet{width:1440px;transform-origin:top left;background:var(--paper);border-radius:18px;
+    box-shadow:0 20px 50px rgba(40,30,12,0.12);padding:42px 46px 46px;}
+  .sh-title{font-size:24px;font-weight:800;letter-spacing:.3px;}
+  .sh-desc{margin-top:7px;font-size:14.5px;font-weight:600;color:var(--sec);}
+  .flowrow{display:flex;align-items:flex-start;gap:0;margin-top:30px;}
+  .step{display:flex;flex-direction:column;align-items:center;width:212px;flex-shrink:0;}
+  .arrow{flex:1;align-self:center;min-width:30px;display:flex;align-items:center;justify-content:center;color:var(--ter);font-size:22px;margin-top:200px;}
+  .cap{margin-top:14px;text-align:center;}
+  .cap .ct{font-size:15px;font-weight:800;color:var(--text);}
+  .cap .cs{margin-top:3px;font-size:12px;font-weight:600;color:var(--sec);line-height:1.45;}
+  .divider{height:1px;background:var(--hair2);margin:38px 0 26px;}
+  .sub-h{font-size:17px;font-weight:800;color:var(--text);margin-bottom:18px;}
+  .exrow{display:flex;gap:30px;align-items:flex-start;}
+  .ex{width:212px;flex-shrink:0;}
+  .ex .cap{margin-top:13px;text-align:left;}
+  .ex .cap .ct{font-size:14.5px;}
+  .ex .cap .cs{font-size:11.5px;}
+  .principle{flex:1;align-self:stretch;background:var(--screen);border-radius:18px;padding:26px 30px;}
+  .principle h3{margin:0 0 14px;font-size:18px;font-weight:800;color:var(--ink);}
+  .principle ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:13px;}
+  .principle li{position:relative;padding-left:26px;font-size:14px;font-weight:600;color:var(--sec);line-height:1.6;}
+  .principle li::before{content:"";position:absolute;left:4px;top:7px;width:9px;height:9px;border-radius:3px;background:var(--green);}
+  .principle li b{color:var(--text);font-weight:800;}
+
+  /* ===== phone ===== */
+  .ph{width:212px;height:430px;border-radius:34px;background:var(--paper);border:1px solid #e4ddcf;
+    box-shadow:0 10px 26px rgba(40,30,12,0.12);padding:7px;}
+  .scr{position:relative;width:100%;height:100%;border-radius:27px;overflow:hidden;background:var(--screen);
+    display:flex;flex-direction:column;font-size:11px;}
+  .notch{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:74px;height:17px;background:#15130f;border-radius:11px;z-index:6;}
+  .sb{height:30px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 15px 3px;color:var(--text);font-size:10px;font-weight:700;flex-shrink:0;}
+  .sb .dots{letter-spacing:1px;color:var(--sec);font-size:9px;}
+  .sbd{color:#fff;}
+  .scrpad{padding:6px 13px;display:flex;flex-direction:column;min-height:0;flex:1;}
+  /* sheet header (modal screens) */
+  .shead{display:flex;align-items:center;justify-content:space-between;padding:8px 13px 6px;flex-shrink:0;}
+  .shead .x{width:22px;height:22px;border-radius:50%;background:rgba(70,55,30,0.07);display:flex;align-items:center;justify-content:center;color:var(--sec);font-size:13px;}
+  .shead .ttl{font-size:13px;font-weight:800;color:var(--text);}
+  .h-ttl{font-size:16px;font-weight:800;color:var(--text);}
+  .h-kick{font-size:10px;font-weight:700;color:var(--ter);}
+  .gear{width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;}
+  .meta{display:flex;align-items:center;justify-content:space-between;margin-top:7px;}
+  .meta .d{font-size:10px;font-weight:700;color:var(--ter);}
+  .chip{border-radius:999px;background:var(--greenSoft);color:var(--ink);font-size:9.5px;font-weight:800;padding:3px 8px;display:inline-flex;align-items:center;gap:4px;}
+  .achieve{margin-top:9px;border-radius:13px;background:linear-gradient(150deg,var(--greenSoft),var(--surface));border:1px solid var(--hair);padding:9px 11px;display:flex;align-items:center;gap:9px;}
+  .achieve .num{font-size:22px;font-weight:800;color:var(--ink);line-height:1;}
+  .achieve .num small{font-size:11px;}
+  .achieve .t{font-size:11px;font-weight:800;color:var(--text);}
+  .achieve .s{font-size:9px;font-weight:700;color:var(--sec);margin-top:1px;}
+  .seclabel{display:flex;align-items:center;gap:6px;margin:11px 1px 7px;}
+  .seclabel span{font-size:10px;font-weight:800;color:var(--ink);}
+  .seclabel i{flex:1;height:1px;background:var(--hair);}
+  .frow{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:12px;padding:7px 9px;margin-bottom:6px;box-shadow:0 1px 2px rgba(40,30,12,0.04);}
+  .ficon{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+  .fname{flex:1;font-size:11.5px;font-weight:700;color:var(--text);}
+  .badge{font-size:9.5px;font-weight:800;border-radius:8px;padding:3px 7px;white-space:nowrap;}
+  .b-urgent{background:var(--tcSoft);color:var(--tcDk);}
+  .b-soon{background:#eef0df;color:#6f7a3e;}
+  .b-ok{background:var(--greenSoft);color:var(--ink);}
+  .fab{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:42px;height:42px;border-radius:50%;background:var(--tc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:300;line-height:1;box-shadow:0 6px 16px color-mix(in oklab,var(--tc) 45%,transparent);z-index:5;}
+  .cartbar{margin-top:7px;border-radius:11px;background:var(--greenSoft);color:var(--ink);padding:7px 11px;font-size:10.5px;font-weight:800;display:flex;align-items:center;gap:6px;}
+  .cartbar .r{margin-left:auto;font-size:9px;opacity:.7;}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+  .tile{border-radius:13px;background:var(--surface);border:1.5px solid transparent;box-shadow:0 1px 2px rgba(40,30,12,0.04);padding:9px 3px 7px;display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;}
+  .tile.on{border-color:var(--blue);background:color-mix(in oklab,var(--blue) 10%,var(--surface));}
+  .tile .ti{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;}
+  .tile .tn{font-size:9px;font-weight:700;color:var(--text);text-align:center;line-height:1.1;}
+  .tile .cnt{position:absolute;top:4px;right:4px;min-width:15px;height:15px;border-radius:999px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  .row-between{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:13px;padding:9px 10px;margin-top:8px;gap:6px;}
+  .rb-t{font-size:11.5px;font-weight:700;color:var(--text);white-space:nowrap;}
+  .rb-s{font-size:9.5px;font-weight:600;color:var(--ter);}
+  .stepper{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  .stepper .sb2{width:23px;height:23px;border-radius:8px;background:rgba(70,55,30,0.06);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--text);flex-shrink:0;}
+  .stepper .sv{font-size:10.5px;font-weight:800;color:var(--text);min-width:40px;text-align:center;white-space:nowrap;}
+  .caltoggle{margin-top:9px;text-align:center;color:var(--ink);font-size:11px;font-weight:800;padding:4px;}
+  .cal{margin-top:7px;background:var(--surface);border-radius:12px;padding:9px;}
+  .cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .cal-h .m{font-size:10.5px;font-weight:800;white-space:nowrap;}
+  .cal-h .n{width:18px;height:18px;border-radius:6px;background:rgba(70,55,30,0.06);display:flex;align-items:center;justify-content:center;font-size:11px;}
+  .cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+  .cal-c{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;color:var(--text);}
+  .cal-c.dow{color:var(--ter);font-weight:800;font-size:8px;}
+  .cal-c.sel{background:var(--tc);color:#fff;}
+  .cal-c.today{box-shadow:inset 0 0 0 1.4px var(--tc);}
+  .cal-c.mute{color:var(--ter);opacity:.4;}
+  .gauge{margin-top:9px;}
+  .gauge .gl{font-size:10px;font-weight:700;color:var(--sec);margin-bottom:5px;display:flex;justify-content:space-between;}
+  .gauge .track{height:9px;border-radius:6px;background:var(--surface2);overflow:hidden;}
+  .gauge .fill{height:100%;border-radius:6px;background:var(--green);}
+  .cta{margin-top:auto;border-radius:13px;background:var(--tc);color:#fff;text-align:center;font-size:12.5px;font-weight:800;padding:11px 0;}
+  .toast{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:#2a241a;color:#fff;border-radius:999px;padding:8px 16px;font-size:10.5px;font-weight:800;white-space:nowrap;z-index:6;display:flex;align-items:center;gap:6px;}
+  /* centered states */
+  .center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 16px;gap:11px;}
+  .bigemoji{width:62px;height:62px;border-radius:20px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 4px 12px rgba(40,30,12,0.08);}
+  .ttl-mid{font-size:14px;font-weight:800;color:var(--text);}
+  .desc-mid{font-size:11px;font-weight:600;color:var(--sec);line-height:1.55;}
+  .btn-mini{border-radius:11px;background:var(--tc);color:#fff;font-size:11px;font-weight:800;padding:8px 18px;}
+  .btn-ghost{border-radius:11px;background:var(--surface2);color:var(--text);font-size:11px;font-weight:800;padding:8px 16px;}
+  .card-mid{background:var(--surface);border-radius:15px;padding:13px 13px;box-shadow:0 5px 14px rgba(40,30,12,0.08);width:100%;}
+  .foot{max-width:1480px;margin:20px auto 0;font-size:12px;font-weight:600;color:var(--ter);}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="heading">
+    <h1>UX フロー</h1>
+    <div class="path">冷蔵庫を見る&nbsp;→&nbsp;足す&nbsp;→&nbsp;食べ頃に使う&nbsp;→&nbsp;食べきり（＋例外）</div>
+    <div class="sub"><span class="grip">⠿</span> フロー全体</div>
+  </div>
+
+  <div class="scaleZone">
+    <div id="sheet">
+      <div class="sh-title">UX フロー：今日の冷蔵庫 → 足す → 期限・残量 → 食べきり</div>
+      <div class="sh-desc">ホームを起点に「足す→使う→記録」を回す。責めない通知でそっと食べ頃を知らせ、出口は「食べきり」ひとつ。</div>
+
+      <!-- ===== MAIN FLOW ===== -->
+      <div class="flowrow">
+        <!-- 1 ホーム -->
+        <div class="step">
+          <div class="ph"><div class="scr">
+            <div class="notch"></div>
+            <div class="sb"><span>9:41</span><span class="dots">●●●</span></div>
+            <div class="scrpad">
+              <div class="meta" style="margin-top:0;">
+                <div><div class="h-kick">こんにちは</div><div class="h-ttl">今日の冷蔵庫</div></div>
+                <div class="gear">⚙</div>
+              </div>
+              <div class="meta">
+                <span class="d">6月10日（火）・5品</span>
+                <span class="chip">◔ 今朝のまとめ</span>
+              </div>
+              <div class="achieve"><div class="num">23<small>品</small></div><div><div class="t">上手に使いきれています</div><div class="s">今月の食べきり記録</div></div></div>
+              <div class="seclabel"><span>食べ頃</span><i></i></div>
+              <div class="frow"><span class="ficon" style="background:#7fa25733;color:#4f6b3a;">菜</span><span class="fname">ほうれん草</span><span class="badge b-urgent">あと1日</span></div>
+              <div class="frow"><span class="ficon" style="background:#c06a5a33;color:#8a4538;">魚</span><span class="fname">刺身（まぐろ）</span><span class="badge b-urgent">今日</span></div>
+              <div class="seclabel"><span>今週の食材</span><i></i></div>
+              <div class="frow"><span class="ficon" style="background:#c5503a33;color:#9e4d3a;">果</span><span class="fname">トマト</span><span class="badge b-soon">あと3日</span></div>
+            </div>
+            <div class="fab">＋</div>
+          </div></div>
+          <div class="cap"><div class="ct">① 今日の冷蔵庫</div><div class="cs">食べ頃順にひと目で／＋で追加</div></div>
+        </div>
+
+        <div class="arrow">→</div>
+
+        <!-- 2 カテゴリ -->
+        <div class="step">
+          <div class="ph"><div class="scr">
+            <div class="notch"></div>
+            <div class="sb"><span>9:41</span><span class="dots">●●●</span></div>
+            <div class="shead"><span class="x">✕</span><span class="ttl">食べものを追加</span><span class="x" style="visibility:hidden;">✕</span></div>
+            <div class="scrpad" style="padding-top:0;">
+              <div class="cartbar">🧺 かごに 2品<span class="r">一覧</span></div>
+              <div class="seclabel"><span>肉・魚介</span><i></i></div>
+              <div class="tiles">
+                <div class="tile on"><span class="cnt" style="background:var(--blue);color:#fff;">1</span><span class="ti" style="background:#5f93a233;color:#3a6f7e;">魚</span><span class="tn">魚・刺身</span></div>
+                <div class="tile"><span class="cnt" style="background:rgba(70,55,30,0.08);color:var(--ter);">＋</span><span class="ti" style="background:#d98a6633;color:#a6593a;">鶏</span><span class="tn">鶏肉</span></div>
+                <div class="tile"><span class="cnt" style="background:rgba(70,55,30,0.08);color:var(--ter);">＋</span><span class="ti" style="background:#c06a5a33;color:#8a4538;">肉</span><span class="tn">豚・牛肉</span></div>
+              </div>
+              <div class="seclabel"><span>野菜・きのこ</span><i></i></div>
+              <div class="tiles">
+                <div class="tile on"><span class="cnt" style="background:var(--blue);color:#fff;">1</span><span class="ti" style="background:#7fa25733;color:#4f6b3a;">菜</span><span class="tn">葉物野菜</span></div>
+                <div class="tile"><span class="cnt" style="background:rgba(70,55,30,0.08);color:var(--ter);">＋</span><span class="ti" style="background:#8aa86e33;color:#566e3c;">野</span><span class="tn">野菜</span></div>
+                <div class="tile"><span class="cnt" style="background:rgba(70,55,30,0.08);color:var(--ter);">＋</span><span class="ti" style="background:#ab8d6833;color:#7a6244;">茸</span><span class="tn">きのこ</span></div>
+              </div>
+            </div>
+          </div></div>
+          <div class="cap"><div class="ct">② 食べものを追加</div><div class="cs">種類ごとのセクションから選ぶ</div></div>
+        </div>
+
+        <div class="arrow">→</div>
+
+        <!-- 3 詳細 -->
+        <div class="step">
+          <div class="ph"><div class="scr">
+            <div class="notch"></div>
+            <div class="sb"><span>9:41</span><span class="dots">●●●</span></div>
+            <div class="shead"><span class="x">✕</span><span class="ttl">ほうれん草</span><span class="x" style="visibility:hidden;">✕</span></div>
+            <div class="scrpad" style="padding-top:2px;">
+              <div class="row-between" style="margin-top:0;">
+                <div style="flex-shrink:0;"><div class="rb-t">もち日数</div></div>
+                <div class="stepper"><span class="sb2">−</span><span class="sv">あと4日</span><span class="sb2">＋</span></div>
+              </div>
+              <div class="caltoggle">📅 カレンダーで日付を選ぶ</div>
+              <div class="cal">
+                <div class="cal-h"><span class="n">‹</span><span class="m">2026年 6月</span><span class="n">›</span></div>
+                <div class="cal-g">
+                  <span class="cal-c dow">日</span><span class="cal-c dow">月</span><span class="cal-c dow">火</span><span class="cal-c dow">水</span><span class="cal-c dow">木</span><span class="cal-c dow">金</span><span class="cal-c dow">土</span>
+                  <span class="cal-c mute"></span><span class="cal-c mute">1</span><span class="cal-c mute">2</span><span class="cal-c mute">3</span><span class="cal-c mute">4</span><span class="cal-c mute">5</span><span class="cal-c mute">6</span>
+                  <span class="cal-c mute">7</span><span class="cal-c mute">8</span><span class="cal-c mute">9</span><span class="cal-c today">10</span><span class="cal-c">11</span><span class="cal-c">12</span><span class="cal-c">13</span>
+                  <span class="cal-c sel">14</span><span class="cal-c">15</span><span class="cal-c">16</span><span class="cal-c">17</span><span class="cal-c">18</span><span class="cal-c">19</span><span class="cal-c">20</span>
+                </div>
+              </div>
+              <div class="gauge"><div class="gl"><span>残量</span><span>多め</span></div><div class="track"><div class="fill" style="width:72%;"></div></div></div>
+              <div class="cta">かごに追加</div>
+            </div>
+          </div></div>
+          <div class="cap"><div class="ct">③ 期限と残量</div><div class="cs">もち日数／カレンダー／残量ゲージ</div></div>
+        </div>
+
+        <div class="arrow">→</div>
+
+        <!-- 4 完了/ホーム -->
+        <div class="step">
+          <div class="ph"><div class="scr">
+            <div class="notch"></div>
+            <div class="sb"><span>9:41</span><span class="dots">●●●</span></div>
+            <div class="scrpad">
+              <div class="meta" style="margin-top:0;">
+                <div><div class="h-kick">こんにちは</div><div class="h-ttl">今日の冷蔵庫</div></div>
+                <div class="gear">⚙</div>
+              </div>
+              <div class="meta"><span class="d">6月10日（火）・7品</span><span class="chip">◔ 今朝のまとめ</span></div>
+              <div class="seclabel"><span>食べ頃</span><i></i></div>
+              <div class="frow"><span class="ficon" style="background:#7fa25733;color:#4f6b3a;">菜</span><span class="fname">ほうれん草</span><span class="badge b-soon">あと4日</span></div>
+              <div class="frow"><span class="ficon" style="background:#5f93a233;color:#3a6f7e;">魚</span><span class="fname">刺身（まぐろ）</span><span class="badge b-ok">あと4日</span></div>
+              <div class="frow"><span class="ficon" style="background:#c5503a33;color:#9e4d3a;">果</span><span class="fname">トマト</span><span class="badge b-soon">あと3日</span></div>
+            </div>
+            <div class="toast">🧺 2品を追加しました</div>
+          </div></div>
+          <div class="cap"><div class="ct">④ 追加完了</div><div class="cs">かごの中身をまとめてホームへ</div></div>
+        </div>
+
+        <div class="arrow">→</div>
+
+        <!-- 5 食べきり -->
+        <div class="step">
+          <div class="ph"><div class="scr" style="background:linear-gradient(180deg,#41614a,#35513d);">
+            <div class="notch"></div>
+            <div class="sb sbd"><span>9:41</span><span class="dots" style="color:rgba(255,255,255,.6);">●●●</span></div>
+            <div class="center">
+              <div style="font-size:11px;font-weight:800;color:var(--greenLt);letter-spacing:1px;">食べきり！</div>
+              <div style="display:flex;align-items:baseline;gap:3px;"><span style="font-size:52px;font-weight:800;color:#fff;line-height:1;">24</span><span style="font-size:18px;font-weight:800;color:#f5f0e6;">品</span></div>
+              <div style="display:flex;gap:5px;margin-top:2px;">
+                <span style="width:18px;height:18px;border-radius:50%;background:var(--tc);"></span>
+                <span style="width:18px;height:18px;border-radius:50%;background:#d8c08a;"></span>
+                <span style="width:18px;height:18px;border-radius:50%;background:var(--green);"></span>
+                <span style="width:18px;height:18px;border-radius:50%;background:#cbb06f;"></span>
+              </div>
+              <div style="font-size:11px;font-weight:700;color:rgba(245,240,230,.85);line-height:1.5;margin-top:6px;">先月より +5品。<br/>いいころあいです🌱</div>
+            </div>
+          </div></div>
+          <div class="cap"><div class="ct">⑤ 食べきり・ふりかえり</div><div class="cs">食べた分を記録／成果が育つ</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ===== EXCEPTIONS ===== -->
+      <div class="sub-h">例外・空状態</div>
+      <div class="exrow">
+        <!-- 空の冷蔵庫 -->
+        <div class="ex">
+          <div class="ph"><div class="scr">
+            <div class="notch"></div>
+            <div class="sb"><span>9:41</span><span class="dots">●●●</span></div>
+            <div class="shead"><div class="h-ttl">今日の冷蔵庫</div><span class="gear">⚙</span></div>
+            <div class="center">
+              <div class="bigemoji">🧺</div>
+              <div class="ttl-mid">冷蔵庫はまだ空っぽ</div>
+              <div class="desc-mid">買ってきた食材を足すと、<br/>食べ頃をお知らせします。</div>
+              <div class="btn-mini">＋ 食べものを足す</div>
+            </div>
+          </div></div>
+          <div class="cap"><div class="ct">空の冷蔵庫（初回）</div><div class="cs">責めず、最初の一歩へやさしく誘導</div></div>
+        </div>
+
+        <!-- やさしいお知らせ -->
+        <div class="ex">
+          <div class="ph"><div class="scr" style="background:linear-gradient(180deg,#eef0e4,#e3e7d6);">
+            <div class="notch"></div>
+            <div class="sb"><span>9:41</span><span class="dots">●●●</span></div>
+            <div class="center">
+              <div class="bigemoji" style="background:#fff;">🔔</div>
+              <div class="card-mid" style="text-align:center;">
+                <div style="font-size:10px;font-weight:800;color:var(--tc);letter-spacing:1px;">そろそろ食べ頃</div>
+                <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:7px 0;">
+                  <span class="ficon" style="background:#7fa25733;color:#4f6b3a;width:22px;height:22px;font-size:11px;">菜</span>
+                  <span style="font-size:14px;font-weight:800;color:var(--ink);">ほうれん草</span>
+                </div>
+                <div style="font-size:10.5px;font-weight:700;color:var(--sec);line-height:1.55;">あと1日でおいしい食べ頃。<br/>今日のごはんに、どうですか？</div>
+              </div>
+            </div>
+          </div></div>
+          <div class="cap"><div class="ct">やさしいお知らせ</div><div class="cs">急かさず、食べ頃をそっとひと声</div></div>
+        </div>
+
+        <!-- 久しぶり起動 -->
+        <div class="ex">
+          <div class="ph"><div class="scr">
+            <div class="notch"></div>
+            <div class="sb"><span>9:41</span><span class="dots">●●●</span></div>
+            <div class="center">
+              <div class="bigemoji">🌿</div>
+              <div class="ttl-mid">おかえりなさい</div>
+              <div class="desc-mid">しばらく空いたみたい。<br/>冷蔵庫、どうしますか？</div>
+              <div style="display:flex;flex-direction:column;gap:8px;width:100%;align-items:center;">
+                <div class="btn-mini" style="width:80%;">そのまま続ける</div>
+                <div class="btn-ghost" style="width:80%;">リセットして始める</div>
+              </div>
+            </div>
+          </div></div>
+          <div class="cap"><div class="ct">久しぶりに起動</div><div class="cs">数日ぶり：再開／リセットを提案</div></div>
+        </div>
+
+        <!-- 原則 -->
+        <div class="principle">
+          <h3>原則</h3>
+          <ul>
+            <li><b>責めない。</b>「捨てた」を咎めず、食品ロスを罪悪感ではなくやさしさで減らす。通知も急かさない言葉で。</li>
+            <li><b>食べ頃を、ひと目で。</b>残り日数を色と順番で示し、何から使えばいいか迷わせない。数字を強要しない。</li>
+            <li><b>いつでも調整できる。</b>もち日数はステッパーでもカレンダーでも。残量はゲージでざっくり。正確さより気軽さ。</li>
+            <li><b>続けたくなる記録。</b>食べきるたびに記録が育ち、ふりかえり・月替わりで成果が見える。失敗は静かに、成功は称えて。</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <p class="foot">※ 本図は現行プロトタイプ（ころあい）の実装に基づくストーリーボード。上段＝主要フロー、下段＝例外・空状態と設計原則。</p>
+</div>
+
+<script>
+(function(){
+  function fit(){
+    const zone=document.querySelector('.scaleZone');
+    const sheet=document.getElementById('sheet');
+    const s=Math.min(1, zone.clientWidth/1440);
+    sheet.style.transform='scale('+s+')';
+    zone.style.height=(sheet.offsetHeight*s)+'px';
+  }
+  window.addEventListener('load',fit);
+  window.addEventListener('resize',fit);
+  fit();
+})();
+</script>
+</body>
+</html>

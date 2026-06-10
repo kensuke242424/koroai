@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ころあい — ブランド看板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<style>
+  body { margin: 0; }
+  .jp { font-family: "M PLUS Rounded 1c", system-ui; }
+  .lat { font-family: "Quicksand", "M PLUS Rounded 1c", system-ui; }
+</style>
+<script type="text/babel">
+const { useId } = React;
+const CREAM = '#f5f0e6', CREAM2 = '#efe7d6', CREAMLT = '#fbf7ee';
+const G = '#6f8f6a', GINK = '#41614a', GDK = '#35513d', GLT = '#8fae87';
+const TC = '#b8604a', TCDK = '#9e4d3a';
+
+const KABU_LEAVES = ["M60 58 Q52 36 43 32 Q47 49 56 58Z", "M60 58 Q60 33 60 26 Q67 36 65 58Z", "M60 58 Q68 36 77 32 Q73 49 64 58Z"];
+const KABU_BULB = "M60 58 Q41 58 39 70 Q49 78 39 86 Q40 98 60 99 Q82 97 82 77 Q80 58 60 58Z";
+
+// アイコン。invert=true で地を緑・実をクリームに（ダーク看板用）
+function Icon({ s = 120, invert = false }) {
+  const uid = useId().replace(/:/g, '');
+  const base = invert ? G : CREAM2, top = invert ? GLT : CREAMLT;
+  const body = invert ? CREAM : TC, leaf = invert ? CREAMLT : G, rim = invert ? GDK : TCDK;
+  return (
+    <svg width={s} height={s} viewBox="0 0 120 120" fill="none">
+      <rect width="120" height="120" fill={base} />
+      <radialGradient id={`sb-${uid}`} cx="50%" cy="38%" r="72%">
+        <stop offset="0%" stopColor={top} stopOpacity="0.9" />
+        <stop offset="70%" stopColor={base} stopOpacity="0" />
+      </radialGradient>
+      <rect width="120" height="120" fill={`url(#sb-${uid})`} />
+      <g transform="rotate(12 60 66)">
+        {KABU_LEAVES.map((d, i) => <path key={i} d={d} fill={leaf} />)}
+        <path d={KABU_BULB} fill={body} />
+        <ellipse cx="51" cy="73" rx="7.5" ry="12" fill="#ffffff" opacity="0.16" />
+        <path d="M39 70 Q49 78 39 86" fill="none" stroke={rim} strokeWidth="1.4" opacity="0.5" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+function RoundIcon({ s, invert }) {
+  return <div style={{ width: s, height: s, borderRadius: s * 0.2237, overflow: 'hidden', boxShadow: '0 8px 22px rgba(40,30,12,0.18)', flexShrink: 0 }}><Icon s={s} invert={invert} /></div>;
+}
+
+// 小さな葉アクセント
+function LeafDot({ c = G, s = 22 }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24"><path d="M12 3 Q20 7 18 16 Q16 22 10 21 Q4 19 5 12 Q6 6 12 3Z" fill={c} /><path d="M12 4 Q10 12 8 19" stroke="#fff" strokeWidth="1.1" opacity="0.5" fill="none" /></svg>;
+}
+
+const Word = ({ latin, size, color, weight = 800 }) => (
+  <span className={latin ? 'lat' : 'jp'} style={{ fontSize: size, fontWeight: weight, color, letterSpacing: latin ? '0.5px' : '1px', lineHeight: 1 }}>
+    {latin ? 'Koroai' : 'ころあい'}
+  </span>
+);
+
+const TAG_JP = 'ちょうどいい食べ頃を、逃さない。';
+const TAG_LAT = 'Catch the right moment to eat.';
+
+/* ── ヒーロー看板 ── */
+function Hero({ latin, dark }) {
+  const bg = dark ? GINK : CREAM;
+  const ink = dark ? CREAMLT : GINK;
+  const sub = dark ? 'rgba(245,240,230,0.7)' : '#8c8273';
+  return (
+    <div style={{ width: '100%', height: '100%', background: bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, position: 'relative', overflow: 'hidden' }}>
+      {/* subtle corner leaves */}
+      <div style={{ position: 'absolute', top: -10, left: -6, opacity: dark ? 0.16 : 0.12, transform: 'rotate(-20deg)' }}><LeafDot c={dark ? CREAMLT : G} s={120} /></div>
+      <div style={{ position: 'absolute', bottom: -16, right: -10, opacity: dark ? 0.16 : 0.1, transform: 'rotate(150deg)' }}><LeafDot c={dark ? CREAMLT : TC} s={150} /></div>
+      <RoundIcon s={150} invert={dark} />
+      <Word latin={latin} size={latin ? 70 : 62} color={ink} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ width: 22, height: 2, background: dark ? GLT : TC, borderRadius: 2 }} />
+        <span className="jp" style={{ fontSize: 16, fontWeight: 700, color: sub }}>{latin ? TAG_LAT : TAG_JP}</span>
+        <span style={{ width: 22, height: 2, background: dark ? GLT : TC, borderRadius: 2 }} />
+      </div>
+    </div>
+  );
+}
+
+/* ── 横ロックアップ ── */
+function Horizontal({ latin }) {
+  return (
+    <div style={{ width: '100%', height: '100%', background: CREAM, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22 }}>
+      <RoundIcon s={96} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <Word latin={latin} size={latin ? 46 : 42} color={GINK} />
+        <span className="jp" style={{ fontSize: 12.5, fontWeight: 700, color: '#8c8273', letterSpacing: latin ? 0 : '1px' }}>{latin ? TAG_LAT : TAG_JP}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── 縦ロックアップ ── */
+function Stacked({ latin }) {
+  return (
+    <div style={{ width: '100%', height: '100%', background: CREAM2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+      <RoundIcon s={120} />
+      <Word latin={latin} size={latin ? 44 : 40} color={GINK} />
+      <span className="jp" style={{ fontSize: 12, fontWeight: 700, color: '#a59a86', letterSpacing: latin ? 0 : '1px' }}>{latin ? TAG_LAT : TAG_JP}</span>
+    </div>
+  );
+}
+
+/* ── 反転（ダーク・グリーン地） ── */
+function Reverse({ latin }) {
+  return (
+    <div style={{ width: '100%', height: '100%', background: GINK, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+      <RoundIcon s={88} invert />
+      <Word latin={latin} size={latin ? 44 : 40} color={CREAMLT} />
+    </div>
+  );
+}
+
+function Board({ latin }) {
+  const id = latin ? 'lat' : 'jp';
+  return (
+    <DCSection id={id} title={latin ? 'Koroai（欧文）' : 'ころあい（和文）'} subtitle="アイコン＋ワードマーク。看板／横／縦／反転のロックアップ">
+      <DCArtboard id={id + '-hero'} label="看板（ライト）" width={760} height={460}>
+        <Hero latin={latin} />
+      </DCArtboard>
+      <DCArtboard id={id + '-hero-d'} label="看板（ダーク）" width={760} height={460}>
+        <Hero latin={latin} dark />
+      </DCArtboard>
+      <DCArtboard id={id + '-h'} label="横ロックアップ" width={540} height={200}>
+        <Horizontal latin={latin} />
+      </DCArtboard>
+      <DCArtboard id={id + '-s'} label="縦ロックアップ" width={380} height={440}>
+        <Stacked latin={latin} />
+      </DCArtboard>
+      <DCArtboard id={id + '-r'} label="反転（グリーン地）" width={540} height={200}>
+        <Reverse latin={latin} />
+      </DCArtboard>
+    </DCSection>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      <Board latin={false} />
+      <Board latin={true} />
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<div id="root"></div>
+</body>
+</html>

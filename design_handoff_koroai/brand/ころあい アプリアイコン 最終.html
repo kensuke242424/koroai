@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ころあい — アプリアイコン 最終</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body { margin: 0; background: #e7e1d4; font-family: "M PLUS Rounded 1c", system-ui; }
+  .stage { min-height: 100vh; box-sizing: border-box; padding: 48px 30px 64px; display: flex; flex-direction: column; align-items: center; }
+  .lead { font-size: 12px; font-weight: 800; letter-spacing: 2px; color: #b8604a; text-transform: uppercase; margin: 0 0 6px; }
+  h1 { margin: 0 0 4px; font-size: 27px; font-weight: 800; color: #3a342b; }
+  .sub { margin: 0 0 36px; font-size: 14px; font-weight: 600; color: #8c8273; }
+  .master { width: 300px; height: 300px; box-shadow: 0 14px 40px rgba(40,30,12,0.2); }
+  .grid { display: flex; gap: 44px; align-items: flex-start; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .cap { font-size: 12px; font-weight: 700; color: #b3aa98; }
+  .specs { margin-top: 40px; font-size: 12.5px; font-weight: 600; color: #8c8273; line-height: 1.8; text-align: center; background: #f1ebdf; border-radius: 14px; padding: 16px 22px; }
+  .specs b { color: #41614a; }
+</style>
+<script type="text/babel">
+const { useId } = React;
+const CREAM2 = '#efe7d6', CREAMLT = '#fbf7ee';
+const G = '#6f8f6a', GINK = '#41614a', GDK = '#35513d';
+const TC = '#b8604a', TCDK = '#9e4d3a';
+
+const KABU_LEAVES = ["M60 58 Q52 36 43 32 Q47 49 56 58Z", "M60 58 Q60 33 60 26 Q67 36 65 58Z", "M60 58 Q68 36 77 32 Q73 49 64 58Z"];
+const KABU_BULB = "M60 58 Q41 58 39 70 Q49 78 39 86 Q40 98 60 99 Q82 97 82 77 Q80 58 60 58Z";
+
+function Icon({ s = 120 }) {
+  const uid = useId().replace(/:/g, '');
+  return (
+    <svg width={s} height={s} viewBox="0 0 120 120" fill="none">
+      <rect width="120" height="120" fill={CREAM2} />
+      <radialGradient id={`sb-${uid}`} cx="50%" cy="38%" r="72%">
+        <stop offset="0%" stopColor={CREAMLT} stopOpacity="0.9" />
+        <stop offset="70%" stopColor={CREAM2} stopOpacity="0" />
+      </radialGradient>
+      <rect width="120" height="120" fill={`url(#sb-${uid})`} />
+      <g transform="rotate(12 60 66)">
+        {KABU_LEAVES.map((d, i) => <path key={i} d={d} fill={G} />)}
+        <path d={KABU_BULB} fill={TC} />
+        <ellipse cx="51" cy="73" rx="7.5" ry="12" fill="#ffffff" opacity="0.16" />
+        <path d="M39 70 Q49 78 39 86" fill="none" stroke={TCDK} strokeWidth="1.4" opacity="0.5" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+function App() {
+  return (
+    <div className="stage">
+      <p className="lead">Koroai · App Icon — Final</p>
+      <h1>ころあい アプリアイコン</h1>
+      <p className="sub">カブ／F配色（クリーム地 × テラコッタ実 × 緑ヘタ）／①小さめかじり</p>
+
+      <div className="grid">
+        <div className="col">
+          <div className="master"><Icon s={300} /></div>
+          <div className="cap">マスター（正方形・角丸なし）1024×1024</div>
+        </div>
+        <div className="col">
+          <div style={{ width: 200, height: 200, borderRadius: '22.37%', overflow: 'hidden', boxShadow: '0 10px 28px rgba(40,30,12,0.22)' }}><Icon s={200} /></div>
+          <div className="cap">ホーム画面（iOS 角丸プレビュー）</div>
+        </div>
+      </div>
+
+      <div className="grid" style={{ marginTop: 30, alignItems: 'center', gap: 22 }}>
+        {[120, 80, 60, 40, 29].map((n) => (
+          <div className="col" key={n} style={{ gap: 6 }}>
+            <div style={{ width: n, height: n, borderRadius: n * 0.2237, overflow: 'hidden', boxShadow: '0 2px 7px rgba(0,0,0,0.16)' }}><Icon s={n} /></div>
+            <div className="cap">{n}px</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="specs">
+        <b>書き出し仕様</b>：1024×1024px・正方形・透過なし・角丸はシステム任せ・アイコン内に文字なし<br />
+        ライト／ダーク両対応（クリーム地で両壁紙に映える）。PNGは <b>export/koroai-icon-1024.png</b> に書き出し済み。
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<div id="root"></div>
+</body>
+</html>

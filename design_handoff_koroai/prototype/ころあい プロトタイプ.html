@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ころあい — 賞味期限管理アプリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "M PLUS Rounded 1c", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #e8e1d4;
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  input { font-family: inherit; }
+  /* swipe cards shouldn't select text while dragging */
+  [style*="cursor: grab"], [style*="cursor:grab"] { user-select: none; -webkit-user-select: none; }
+
+  @keyframes fkToast {
+    0%   { opacity: 0; transform: translateY(14px) scale(0.96); }
+    10%  { opacity: 1; transform: translateY(0) scale(1); }
+    82%  { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-6px) scale(0.99); }
+  }
+  @keyframes fkScrimIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fkSheetPop {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  @keyframes fkRingPop {
+    0%   { transform: translate(-50%,-50%) scale(.3); opacity: .5; }
+    70%  { opacity: .22; }
+    100% { transform: translate(-50%,-50%) scale(1.75); opacity: 0; }
+  }
+  @keyframes fkCheckPop {
+    0%   { transform: translate(-50%,-50%) scale(0);   opacity: 0; }
+    45%  { transform: translate(-50%,-50%) scale(1.15); opacity: 1; }
+    70%  { transform: translate(-50%,-50%) scale(.94); }
+    100% { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
+  }
+  @keyframes fkSpark {
+    0%   { transform: translateY(0) scale(1);   opacity: 0; }
+    25%  { opacity: 1; }
+    100% { transform: translateY(-52px) scale(.4); opacity: 0; }
+  }
+  @keyframes fkBurstFade { 0%,78% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes fkBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+  @keyframes fkEatCard {
+    0%   { transform: scale(1);    opacity: 1; }
+    16%  { transform: scale(1.035); }
+    100% { transform: scale(.9);   opacity: 0; }
+  }
+  @keyframes fkPraiseIn {
+    0%   { opacity: 0; transform: translateY(4px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fkNumPop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.38); }
+    100% { transform: scale(1); }
+  }
+  @keyframes fkNumSpark {
+    0%   { transform: translate(-50%,-50%) scale(1);   opacity: 0; }
+    25%  { opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(.3); opacity: 0; }
+  }
+  @keyframes fkResultPop {
+    0%   { opacity: 0; transform: translateY(18px) scale(.96); }
+    100% { opacity: 1; transform: none; }
+  }
+  @keyframes fkResultChip {
+    0%   { opacity: 0; transform: translateY(9px); }
+    100% { opacity: 1; transform: none; }
+  }
+  @keyframes fkResultBadge {
+    0%   { opacity: 0; transform: scale(.6); }
+    60%  { transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes fkLeafFall {
+    0%   { opacity: 0; transform: translate(0, 0); }
+    8%   { opacity: .85; }
+    90%  { opacity: .85; }
+    100% { opacity: 0; transform: translate(var(--drift), 560px); }
+  }
+  @keyframes fkLeafSpin {
+    0%   { transform: rotate(-12deg); }
+    50%  { transform: rotate(200deg); }
+    100% { transform: rotate(372deg); }
+  }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</head>
+<body>
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" fill="#6f8f6a"/>
+      <circle cx="50" cy="44" r="22" fill="#f3ede2"/>
+      <path d="M40 44l7 7 14-15" stroke="#6f8f6a" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="50" y="82" font-size="15" fill="#f3ede2" text-anchor="middle" font-family="sans-serif" font-weight="bold">ころあい</text>
+    </svg>
+  </template>
+
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- data + theme (plain JS) -->
+  <script src="fk-data.js"></script>
+  <!-- starters + components (babel) -->
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="fk-ui.jsx"></script>
+  <script type="text/babel" src="fk-home.jsx"></script>
+  <script type="text/babel" src="fk-flows.jsx"></script>
+  <script type="text/babel" src="fk-digest.jsx"></script>
+  <script type="text/babel" src="fk-return.jsx"></script>
+  <script type="text/babel" src="fk-result.jsx"></script>
+  <script type="text/babel" src="fk-review.jsx"></script>
+  <script type="text/babel" src="fk-settings.jsx"></script>
+  <script type="text/babel" src="fk-app.jsx"></script>
+</body>
+</html>
