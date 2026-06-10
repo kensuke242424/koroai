@@ -39,13 +39,16 @@ struct SwipeableRow<Content: View>: View {
             content()
                 .background(Color.clear)
                 .offset(x: dx, y: dy)
-                .gesture(dragGesture)
-                .simultaneousGesture(
-                    // スワイプでない純粋タップ
-                    TapGesture().onEnded {
-                        if !moved, let onTap { onTap() }
-                    }
-                )
+                .contentShape(Rectangle())
+                // スワイプでない純粋タップ。通常優先度で付けることで、子の Button が消費した
+                // タップには発火しない（プロトタイプ FKSwipe の closest('button') 除外に相当）。
+                // simultaneousGesture にすると「食べた」ボタン押下と同時に編集が開くバグになる。
+                .onTapGesture {
+                    onTap?()
+                }
+                // ドラッグは simultaneous で重ねる（ボタン上から開始したスワイプも追跡できるように）。
+                // minimumDistance を 12 にして、純粋タップがドラッグに食われないようにする。
+                .simultaneousGesture(dragGesture)
         }
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .frame(height: collapsed ? 0 : nil)
@@ -117,7 +120,7 @@ struct SwipeableRow<Content: View>: View {
     // MARK: - ジェスチャ
 
     private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
+        DragGesture(minimumDistance: 12)
             .onChanged { value in
                 let ddx = value.translation.width
                 let ddy = value.translation.height

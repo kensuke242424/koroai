@@ -32,7 +32,10 @@ struct ContentView: View {
                     guideReplay = false
                 }
             } else {
-                HomeView(onReplayGuide: { guideReplay = true })
+                // ふりかえり等の push 遷移用に NavigationStack を張る（ホーム自身はナビバー非表示）。
+                NavigationStack {
+                    HomeView(onReplayGuide: { guideReplay = true })
+                }
             }
         }
         .environment(\.tokens, tokens)

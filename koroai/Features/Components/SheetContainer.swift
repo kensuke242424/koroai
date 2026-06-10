@@ -4,6 +4,10 @@
 // - スクリム rgba(20,14,6,0.34)・タップで onDismissRequest（即閉じではない＝呼び出し側が閉じ判断）。
 // - パネルは bg2・上角丸28・上部に 40×5 のハンドル・下からスプリング（response≈0.34）で出入り。
 // - maxHeight は画面の 88%。height を指定すると固定高（追加シートは 84%）。
+// - パネルは物理下端（ホームインジケータの下）まで届く。既定では中身の下に
+//   セーフエリア分のスペーサーを入れて操作要素を上げる。下部バーを画面下端まで
+//   敷きたいシート（追加シートのかごバー等）は extendContentUnderHomeIndicator: true を渡し、
+//   中身側で余白を管理する。
 // Step 5 の編集シートでも再利用するため、中身は @ViewBuilder で受ける汎用コンテナにする。
 
 import SwiftUI
@@ -12,6 +16,8 @@ struct SheetContainer<Content: View>: View {
     @Binding var isPresented: Bool
     /// シート高さの画面比（0...1）。nil なら内容にフィット（maxHeight 88% まで）。
     var heightFraction: CGFloat?
+    /// true なら中身を物理下端まで伸ばす（下部バーを敷くシート用）。既定 false。
+    var extendContentUnderHomeIndicator: Bool = false
     /// スクリムタップ時の要求（即閉じではない）。nil なら isPresented を false にする既定動作。
     var onDismissRequest: (() -> Void)?
     @ViewBuilder var content: () -> Content
@@ -23,6 +29,9 @@ struct SheetContainer<Content: View>: View {
 
     var body: some View {
         GeometryReader { geo in
+            // 外側で .ignoresSafeArea(.bottom) 済みなので、無視した下インセットが
+            // safeAreaInsets.bottom として得られる（パネル内の下余白に使う）。
+            let bottomInset = geo.safeAreaInsets.bottom
             ZStack(alignment: .bottom) {
                 if isPresented {
                     // スクリム
@@ -31,18 +40,23 @@ struct SheetContainer<Content: View>: View {
                         .transition(.opacity)
                         .onTapGesture { requestDismiss() }
 
-                    // パネル（下からスプリング）
-                    panel(maxHeight: geo.size.height * 0.88, height: heightFraction.map { geo.size.height * $0 })
-                        .transition(.move(edge: .bottom))
+                    // パネル（下からスプリング・物理下端まで届く）
+                    panel(
+                        maxHeight: geo.size.height * 0.88,
+                        height: heightFraction.map { geo.size.height * $0 },
+                        bottomInset: bottomInset
+                    )
+                    .transition(.move(edge: .bottom))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .animation(.spring(response: 0.34, dampingFraction: 0.86), value: isPresented)
         }
+        .ignoresSafeArea(edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
-    private func panel(maxHeight: CGFloat, height: CGFloat?) -> some View {
+    private func panel(maxHeight: CGFloat, height: CGFloat?, bottomInset: CGFloat) -> some View {
         VStack(spacing: 0) {
             // ハンドル 40×5
             Capsule()
@@ -52,23 +66,25 @@ struct SheetContainer<Content: View>: View {
                 .padding(.bottom, 2)
 
             content()
+
+            // 既定では操作要素をホームインジケータの上に保つ。
+            if !extendContentUnderHomeIndicator {
+                Color.clear.frame(height: bottomInset)
+            }
         }
         .frame(maxWidth: .infinity)
         .frame(height: height, alignment: .top)
         .frame(maxHeight: maxHeight, alignment: .top)
-        .background {
-            // パネル背景はホームインジケータ領域（下のセーフエリア）まで延長する。
-            // これが無いとパネルがセーフエリア下端で止まり、背後のスクリムが帯状に見える。
-            UnevenRoundedRectangle(
+        .background(
+            tokens.bg2,
+            in: UnevenRoundedRectangle(
                 topLeadingRadius: 28, bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0, topTrailingRadius: 28,
                 style: .continuous
             )
-            .fill(tokens.bg2)
-            .ignoresSafeArea(edges: .bottom)
-            .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
-                    radius: 20, x: 0, y: -8)
-        }
+        )
+        .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
+                radius: 20, x: 0, y: -8)
     }
 
     private func requestDismiss() {

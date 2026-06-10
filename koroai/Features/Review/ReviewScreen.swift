@@ -59,6 +59,8 @@ struct ReviewScreen: View {
                 }
             }
         }
+        // push 遷移で表示する（システムナビバーは隠して自前の topBar を使う）。
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     // MARK: - トップバー

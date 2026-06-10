@@ -61,8 +61,12 @@ struct HomeView: View {
     private var split: HomeSplit { HomeSplitter.split(items: items) }
     private var monthlyAte: Int { Stats.monthlyAteCount(logs: logs) }
 
-    // クロスフェード進行: clamp((y-26)/34)。出典: fk-app.jsx titleP。
+    // 大タイトルのフェード進行: clamp((y-26)/34)。出典: fk-app.jsx titleP。
     private var titleProgress: CGFloat { clamp01((scrollY - 26) / 34) }
+    // キッカー（おはようございます）はトップにスクロール位置があるときだけ表示（ユーザー指定）。
+    private var kickerProgress: CGFloat { clamp01(scrollY / 24) }
+    // 小タイトルは大タイトルが隠れた（titleProgress でほぼ消えた）タイミングで入れ替わる（ユーザー指定）。
+    private var compactTitleProgress: CGFloat { clamp01((scrollY - 52) / 26) }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -89,13 +93,6 @@ struct HomeView: View {
 
             // 今朝のまとめシート。
             DigestSheet(isPresented: $digestPresented)
-
-            // ふりかえり（全画面オーバーレイ・最上位）。出入りは opacity。
-            if reviewPresented {
-                ReviewScreen(isPresented: $reviewPresented)
-                    .transition(.opacity)
-                    .zIndex(100)
-            }
 
             // 設定（全画面オーバーレイ・最上位）。
             if settingsPresented {
@@ -134,7 +131,11 @@ struct HomeView: View {
                     .zIndex(140)
             }
         }
-        .animation(.easeInOut(duration: 0.28), value: reviewPresented)
+        // ふりかえりは NavigationStack の push 遷移（ユーザー指定）。ContentView 側で Stack を張る。
+        .navigationDestination(isPresented: $reviewPresented) {
+            ReviewScreen(isPresented: $reviewPresented)
+        }
+        .toolbar(.hidden, for: .navigationBar)
         .animation(.easeInOut(duration: 0.28), value: settingsPresented)
         .animation(.easeInOut(duration: 0.3), value: returnPresented)
         .animation(.easeInOut(duration: 0.3), value: monthResult)
@@ -302,19 +303,20 @@ struct HomeView: View {
 
     private var navBar: some View {
         HStack(alignment: .center, spacing: 10) {
-            // キッカー ⇄ 小タイトルのクロスフェード
+            // キッカー ⇄ 小タイトルの入れ替え。
+            // キッカーはトップ付近でのみ表示し、小タイトルは大タイトルが隠れてから現れる。
             ZStack(alignment: .leading) {
                 Text(store.tone.copy.homeKicker)
                     .font(AppFont.rounded(size: 14, weight: .bold))
                     .foregroundStyle(tokens.textSec)
-                    .opacity(Double(clamp01(1 - titleProgress * 1.4)))
-                    .offset(y: titleProgress * -6)
+                    .opacity(Double(1 - kickerProgress))
+                    .offset(y: kickerProgress * -6)
                 Text(headline)
                     .font(AppFont.rounded(size: 17, weight: .heavy))
                     .foregroundStyle(tokens.text)
                     .lineLimit(1)
-                    .opacity(Double(titleProgress))
-                    .offset(y: (1 - titleProgress) * 7)
+                    .opacity(Double(compactTitleProgress))
+                    .offset(y: (1 - compactTitleProgress) * 7)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -340,7 +342,7 @@ struct HomeView: View {
         .background(tokens.bg)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(titleProgress > 0.6 ? tokens.hair : .clear)
+                .fill(compactTitleProgress > 0.5 ? tokens.hair : .clear)
                 .frame(height: 1)
         }
         .zIndex(50)

@@ -52,17 +52,23 @@ struct AddSheet: View {
     private var copy: ToneCopy { store.tone.copy }
 
     var body: some View {
-        SheetContainer(
-            isPresented: $isPresented,
-            heightFraction: 0.84,
-            onDismissRequest: { handleDismiss() }
-        ) {
-            ZStack {
+        ZStack {
+            SheetContainer(
+                isPresented: $isPresented,
+                heightFraction: 0.84,
+                extendContentUnderHomeIndicator: true, // かごバーを画面下端まで敷く（デザイン準拠）
+                onDismissRequest: { handleDismiss() }
+            ) {
                 gridLayer
-                detailOverlay
-                confirmCloseOverlay
             }
+
+            // 詳細入力／閉じる確認は「トップモーダル」なので、シートの内側ではなく
+            // 全画面に重ねる（背後＝ホーム＋カテゴリ選択シートの全体をスクリムでマスクする）。
+            detailOverlay
+            confirmCloseOverlay
         }
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.view)
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.confirmClose)
         .onChange(of: isPresented) { _, presented in
             if presented {
                 model.reset()
@@ -375,14 +381,10 @@ struct AddSheet: View {
         }
         .padding(.horizontal, 18)
         .padding(.top, 11)
+        // デザイン準拠のタイトな下余白（バー自体が物理下端まで届くので 13pt のみ。
+        // ホームインジケータは surface の上に浮く＝プロトタイプの見た目）。
         .padding(.bottom, 13)
-        .background {
-            // 出典: fk-flows.jsx CTA バー（padding に env(safe-area-inset-bottom) を含む）。
-            // surface 背景をホームインジケータ領域まで延長し、バーがシートと一体に見えるようにする。
-            Rectangle()
-                .fill(tokens.surface)
-                .ignoresSafeArea(edges: .bottom)
-        }
+        .background(tokens.surface)
         .overlay(alignment: .top) {
             Rectangle().fill(tokens.hair).frame(height: 1)
         }
@@ -394,13 +396,15 @@ struct AddSheet: View {
     private var detailOverlay: some View {
         if model.view == .detail {
             ZStack(alignment: .bottom) {
-                // スクリム（タップで grid へ戻る）
+                // スクリム（タップで grid へ戻る）。トップモーダルとして背後の全 View
+                // （ホーム＋カテゴリ選択シート）を画面全体でマスクする。
                 Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.30)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
                     .onTapGesture { model.view = .grid }
                 detailPanel
                     .transition(.move(edge: .bottom))
             }
-            .transition(.opacity)
         }
     }
 
@@ -430,6 +434,8 @@ struct AddSheet: View {
             let n = model.cartCount
             ZStack(alignment: .bottom) {
                 Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
                     .onTapGesture { model.confirmClose = false }
                 VStack(alignment: .leading, spacing: 0) {
                     Text("かごに \(n)品 残っています")
@@ -482,8 +488,8 @@ struct AddSheet: View {
                     .fill(tokens.bg2)
                     .ignoresSafeArea(edges: .bottom)
                 }
+                .transition(.move(edge: .bottom))
             }
-            .transition(.opacity)
         }
     }
 

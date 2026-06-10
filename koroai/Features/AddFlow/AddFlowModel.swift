@@ -15,7 +15,7 @@ import SwiftData
 final class AddFlowModel {
 
     /// シート内の表示。grid（カテゴリ選択）/ detail（詳細入力オーバーレイ）。
-    enum DetailView {
+    enum DetailView: Equatable {
         case grid
         case detail
     }
