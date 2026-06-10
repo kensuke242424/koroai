@@ -23,6 +23,9 @@ struct HomeView: View {
     @State private var scrollY: CGFloat = 0
     @State private var praiseTemplate: String = HomeCopy.pickPraise(avoiding: nil)
     @State private var addFlowPresented = false
+    /// 編集シートの対象。行/ヒーローのタップで設定し、nil 以外なら editSheetPresented を開く。
+    @State private var editingItem: FoodItem?
+    @State private var editSheetPresented = false
 
     /// 設定・まとめ・ふりかえり・追加・編集など未実装画面の動線。
     /// closure 注入で後から差し替えやすくしておく（既定は「準備中です」トースト）。
@@ -53,6 +56,14 @@ struct HomeView: View {
 
             // 追加シート（FAB より上に重ねる）。自作 SheetContainer（native .sheet は使わない）。
             AddSheet(isPresented: $addFlowPresented)
+
+            // 編集シート（追加シートより上に重ねる）。
+            EditSheet(
+                isPresented: $editSheetPresented,
+                item: editingItem,
+                onAte: ate(_:),
+                onToss: toss(_:)
+            )
         }
         #if DEBUG
         .onAppear { applyAddFlowLaunchHooks() }
@@ -62,10 +73,14 @@ struct HomeView: View {
     #if DEBUG
     /// スクショ用 DEBUG フック。-openAddSheet で追加シートを初期表示、
     /// -openAddDetail <catId> でそのカテゴリの詳細入力まで開く。
+    /// -openEditFirst で先頭アイテムの編集シートを初期表示する。
     private func applyAddFlowLaunchHooks() {
         let args = CommandLine.arguments
         if args.contains("-openAddSheet") || args.contains("-openAddDetail") {
             addFlowPresented = true
+        }
+        if args.contains("-openEditFirst"), let first = items.first {
+            openEdit(first)
         }
     }
     #endif
@@ -175,12 +190,11 @@ struct HomeView: View {
                         split: split,
                         onAte: ate(_:),
                         onToss: toss(_:),
-                        // TODO(Step 5): 編集シートへ
                         onEdit: { item in
                             if let onEditItem {
                                 onEditItem(item)
                             } else {
-                                toast.show(.toss, "準備中です")
+                                openEdit(item)
                             }
                         },
                         onRecipe: { toast.show(.toss, "準備中です") } // ユーザー決定: レシピは準備中
@@ -368,6 +382,12 @@ struct HomeView: View {
         } else {
             addFlowPresented = true
         }
+    }
+
+    /// 編集動線。対象をセットしてから編集シートを開く。
+    private func openEdit(_ item: FoodItem) {
+        editingItem = item
+        editSheetPresented = true
     }
 
     /// 未実装動線: closure があれば呼ぶ、なければ「準備中です」トースト。
