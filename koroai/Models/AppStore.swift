@@ -17,6 +17,7 @@ final class AppStore {
         static let palette = "settings.palette"
         static let tone = "settings.tone"
         static let showAchievementCard = "settings.showAchievementCard"
+        static let amountModeOverrides = "settings.amountModeOverrides"
     }
 
     var themeMode: ThemeMode {
@@ -35,6 +36,13 @@ final class AppStore {
         didSet { defaults.set(showAchievementCard, forKey: Keys.showAchievementCard) }
     }
 
+    /// 残量モードのカテゴリ別上書き（README「選んだモードは記憶」）。
+    /// catId → AmountMode.rawValue の辞書として UserDefaults に永続化する。
+    /// 詳細を開くときの初期モード = override ?? カテゴリ既定。詳細でモードを切り替えたら更新する。
+    private var amountModeOverrides: [String: String] {
+        didSet { defaults.set(amountModeOverrides, forKey: Keys.amountModeOverrides) }
+    }
+
     private let defaults: UserDefaults
 
     /// - Parameter defaults: 注入可能（テスト・プレビュー用）。既定は .standard。
@@ -45,5 +53,18 @@ final class AppStore {
         palette = (defaults.string(forKey: Keys.palette)).flatMap(Palette.init(rawValue:)) ?? .hinoki
         tone = (defaults.string(forKey: Keys.tone)).flatMap(Tone.init(rawValue:)) ?? .gentle
         showAchievementCard = defaults.object(forKey: Keys.showAchievementCard) as? Bool ?? true
+        amountModeOverrides = (defaults.dictionary(forKey: Keys.amountModeOverrides) as? [String: String]) ?? [:]
+    }
+
+    // MARK: - 残量モードの記憶
+
+    /// 指定カテゴリのユーザー上書き残量モード（未設定なら nil）。
+    func amountModeOverride(for catId: String) -> AmountMode? {
+        amountModeOverrides[catId].flatMap(AmountMode.init(rawValue:))
+    }
+
+    /// 指定カテゴリの残量モード上書きを保存する。
+    func setAmountModeOverride(_ mode: AmountMode, for catId: String) {
+        amountModeOverrides[catId] = mode.rawValue
     }
 }

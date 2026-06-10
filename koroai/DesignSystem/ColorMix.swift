@@ -116,6 +116,23 @@ func mixWithTransparent(_ x: Color, fractionOfFirst: Double) -> Color {
     x.opacity(min(max(fractionOfFirst, 0), 1))
 }
 
+// MARK: - 中立コントロール背景
+
+/// テーマに依存する裸の rgba を出し分ける中立背景の共通ヘルパー。
+/// プロトタイプ各所（FKHomeC レシピボタン・FKStepper・FKDatePicker のナビ・FKCatTile の＋バッジ・
+/// 取り消し✕ボタン）が使う `light rgba(70,55,30,0.06) / dark rgba(255,255,255,0.08)` を一元化する。
+/// 出典: fk-home.jsx / fk-flows.jsx。HeroCard も本ヘルパーへ移行し重複定義を残さない。
+enum ControlColors {
+    private static let light = Color(.sRGB, red: 70 / 255, green: 55 / 255, blue: 30 / 255, opacity: 0.06)
+    private static let dark = Color(.sRGB, red: 1, green: 1, blue: 1, opacity: 0.08)
+
+    /// 中立コントロール背景。opacity は呼び出し側の文脈に合わせて指定する
+    /// （プロトタイプは 0.06〜0.07 の幅で使い分けるため）。既定は 0.06。
+    static func neutral(isDark: Bool, lightOpacity: Double = 0.06) -> Color {
+        isDark ? dark : Color(.sRGB, red: 70 / 255, green: 55 / 255, blue: 30 / 255, opacity: lightOpacity)
+    }
+}
+
 // MARK: - 残量の塗り色（fkFillColor 移植）
 
 extension Color {

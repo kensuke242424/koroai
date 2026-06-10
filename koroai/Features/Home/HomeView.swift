@@ -22,6 +22,7 @@ struct HomeView: View {
 
     @State private var scrollY: CGFloat = 0
     @State private var praiseTemplate: String = HomeCopy.pickPraise(avoiding: nil)
+    @State private var addFlowPresented = false
 
     /// 設定・まとめ・ふりかえり・追加・編集など未実装画面の動線。
     /// closure 注入で後から差し替えやすくしておく（既定は「準備中です」トースト）。
@@ -49,8 +50,25 @@ struct HomeView: View {
 
             fab
             ToastOverlay()
+
+            // 追加シート（FAB より上に重ねる）。自作 SheetContainer（native .sheet は使わない）。
+            AddSheet(isPresented: $addFlowPresented)
+        }
+        #if DEBUG
+        .onAppear { applyAddFlowLaunchHooks() }
+        #endif
+    }
+
+    #if DEBUG
+    /// スクショ用 DEBUG フック。-openAddSheet で追加シートを初期表示、
+    /// -openAddDetail <catId> でそのカテゴリの詳細入力まで開く。
+    private func applyAddFlowLaunchHooks() {
+        let args = CommandLine.arguments
+        if args.contains("-openAddSheet") || args.contains("-openAddDetail") {
+            addFlowPresented = true
         }
     }
+    #endif
 
     // MARK: - コンパクトナビバー（常設）
 
@@ -144,7 +162,7 @@ struct HomeView: View {
     private var contentArea: some View {
         VStack(spacing: 0) {
             if items.isEmpty {
-                EmptyFridgeView(tone: store.tone) { fire(onAdd) } // TODO(Step 4): 追加フローへ
+                EmptyFridgeView(tone: store.tone) { openAdd() }
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
             } else {
@@ -286,7 +304,7 @@ struct HomeView: View {
 
     private var fab: some View {
         Button {
-            fire(onAdd) // TODO(Step 4): 追加フローへ
+            openAdd()
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 30, weight: .semibold))
@@ -342,6 +360,15 @@ struct HomeView: View {
     }
 
     // MARK: - ヘルパー
+
+    /// 追加動線。onAdd 注入があればそれを優先、なければ自作の追加シートを開く。
+    private func openAdd() {
+        if let onAdd {
+            onAdd()
+        } else {
+            addFlowPresented = true
+        }
+    }
 
     /// 未実装動線: closure があれば呼ぶ、なければ「準備中です」トースト。
     private func fire(_ action: (() -> Void)?) {

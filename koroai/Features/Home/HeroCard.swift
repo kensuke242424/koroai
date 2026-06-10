@@ -25,10 +25,6 @@ struct HeroCard: View {
     @State private var order: [UUID] = []
     @State private var bursting = false
 
-    // 中立背景（レシピボタン）。出典: fk-home.jsx FKHomeC rgba(70,55,30,0.06) / dark rgba(255,255,255,0.08)
-    private static let neutralLight = Color(.sRGB, red: 70 / 255, green: 55 / 255, blue: 30 / 255, opacity: 0.06)
-    private static let neutralDark = Color(.sRGB, red: 1, green: 1, blue: 1, opacity: 0.08)
-
     /// デッキの実効順序。@State の order に未反映の urgent があっても落とさないよう、
     /// order に無い urgent は末尾に補って必ず全件を返す（初回レンダーで空にならないようにする）。
     private var deck: [FoodItem] {
@@ -200,7 +196,7 @@ struct HeroCard: View {
     }
 
     private var neutralBg: Color {
-        tokens.colorSchemeIsDark ? Self.neutralDark : Self.neutralLight
+        ControlColors.neutral(isDark: tokens.colorSchemeIsDark)
     }
 
     /// 160° グラデ: mixOKLab(solid, surface, 0.16) → surface。
