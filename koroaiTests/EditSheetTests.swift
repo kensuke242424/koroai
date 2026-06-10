@@ -232,35 +232,4 @@ struct EditSheetModelTests {
     }
 }
 
-// MARK: - 取り消し（ログを書かない）
 
-@MainActor
-struct EditRemoveTests {
-
-    private func cal() -> Calendar { TestSupport.tokyoCalendar() }
-    private func now() -> Date { TestSupport.fixedNow(cal()) }
-
-    @Test func removeDeletesItemWithoutWritingLog() throws {
-        let context = try TestSupport.makeContext()
-        let cat = FoodCategory.find("veg")!
-        let item = FoodItem(
-            catId: "veg",
-            name: "トマト",
-            purchasedAt: now(),
-            expiresAt: DateMath.expiryDate(daysFromNow: 5, from: now(), calendar: cal()),
-            perishable: cat.perishable,
-            unit: "個"
-        )
-        context.insert(item)
-        try context.save()
-        #expect(try context.fetch(FetchDescriptor<FoodItem>()).count == 1)
-
-        // 「登録を取り消す」相当: ログを残さず削除。
-        context.delete(item)
-        try context.save()
-
-        #expect(try context.fetch(FetchDescriptor<FoodItem>()).count == 0)
-        // ConsumptionLog は1件も書かれていないこと。
-        #expect(try context.fetch(FetchDescriptor<ConsumptionLog>()).count == 0)
-    }
-}

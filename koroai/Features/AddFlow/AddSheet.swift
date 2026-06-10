@@ -376,7 +376,13 @@ struct AddSheet: View {
         .padding(.horizontal, 18)
         .padding(.top, 11)
         .padding(.bottom, 13)
-        .background(tokens.surface)
+        .background {
+            // 出典: fk-flows.jsx CTA バー（padding に env(safe-area-inset-bottom) を含む）。
+            // surface 背景をホームインジケータ領域まで延長し、バーがシートと一体に見えるようにする。
+            Rectangle()
+                .fill(tokens.surface)
+                .ignoresSafeArea(edges: .bottom)
+        }
         .overlay(alignment: .top) {
             Rectangle().fill(tokens.hair).frame(height: 1)
         }
@@ -403,14 +409,16 @@ struct AddSheet: View {
             DetailForm(model: model, isEditing: model.editingId != nil)
         }
         .frame(maxHeight: .infinity)
-        .background(
-            tokens.bg2,
-            in: UnevenRoundedRectangle(
+        .background {
+            // 背景はホームインジケータ領域まで延長（SheetContainer と同じ扱い）。
+            UnevenRoundedRectangle(
                 topLeadingRadius: 24, bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0, topTrailingRadius: 24,
                 style: .continuous
             )
-        )
+            .fill(tokens.bg2)
+            .ignoresSafeArea(edges: .bottom)
+        }
         .padding(.top, 40)
     }
 
@@ -464,14 +472,16 @@ struct AddSheet: View {
                 .padding(.horizontal, 22)
                 .padding(.top, 20)
                 .padding(.bottom, 18)
-                .background(
-                    tokens.bg2,
-                    in: UnevenRoundedRectangle(
+                .background {
+                    // 背景はホームインジケータ領域まで延長（SheetContainer と同じ扱い）。
+                    UnevenRoundedRectangle(
                         topLeadingRadius: 22, bottomLeadingRadius: 0,
                         bottomTrailingRadius: 0, topTrailingRadius: 22,
                         style: .continuous
                     )
-                )
+                    .fill(tokens.bg2)
+                    .ignoresSafeArea(edges: .bottom)
+                }
             }
             .transition(.opacity)
         }

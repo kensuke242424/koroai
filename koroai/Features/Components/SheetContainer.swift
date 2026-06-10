@@ -56,17 +56,19 @@ struct SheetContainer<Content: View>: View {
         .frame(maxWidth: .infinity)
         .frame(height: height, alignment: .top)
         .frame(maxHeight: maxHeight, alignment: .top)
-        .background(
-            tokens.bg2,
-            in: UnevenRoundedRectangle(
+        .background {
+            // パネル背景はホームインジケータ領域（下のセーフエリア）まで延長する。
+            // これが無いとパネルがセーフエリア下端で止まり、背後のスクリムが帯状に見える。
+            UnevenRoundedRectangle(
                 topLeadingRadius: 28, bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0, topTrailingRadius: 28,
                 style: .continuous
             )
-        )
-        .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
-                radius: 20, x: 0, y: -8)
-        .ignoresSafeArea(edges: .bottom)
+            .fill(tokens.bg2)
+            .ignoresSafeArea(edges: .bottom)
+            .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
+                    radius: 20, x: 0, y: -8)
+        }
     }
 
     private func requestDismiss() {

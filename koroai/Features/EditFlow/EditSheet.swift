@@ -2,10 +2,10 @@
 //
 // native .sheet は使わず SheetContainer（height auto・maxHeight 88%・スクロール可）内に組む。
 // 構成: キャプション → カテゴリアイコン+名前 → 今日行 → もち日数カード → カレンダートグル/ピッカー →
-//   残量セクション(edit) → クイックアクション行（食べた / そっと処分）→ 保存 → キャンセル/登録を取り消す。
+//   残量セクション(edit) → クイックアクション行（食べた / そっと処分）→ 保存 → キャンセル。
 //
 // 「食べた / そっと処分」は HomeView の既存 ate/toss を closure で受け、ConsumptionLog 記録＋削除＋トーストは
-// 呼び出し側に委ねる。「登録を取り消す」はログを残さず削除（誤登録用）。
+// 呼び出し側に委ねる。
 
 import SwiftUI
 import SwiftData
@@ -87,7 +87,6 @@ struct EditSheet: View {
                 .padding(.bottom, 12)
             saveButton
             cancelButton
-            removeButton
         }
         .padding(.horizontal, 22)
         .padding(.top, 14)
@@ -239,7 +238,7 @@ struct EditSheet: View {
         .padding(.bottom, 10)
     }
 
-    // MARK: - キャンセル / 登録を取り消す
+    // MARK: - キャンセル
 
     private var cancelButton: some View {
         Button {
@@ -252,24 +251,5 @@ struct EditSheet: View {
                 .padding(.vertical, 10)
         }
         .buttonStyle(.plain)
-    }
-
-    /// 誤登録用。ログを残さず item を削除する（ConsumptionLog は書かない）。
-    private var removeButton: some View {
-        Button {
-            guard let item else { return }
-            context.delete(item)
-            try? context.save()
-            toast.show(.toss, "取り消しました")
-            isPresented = false
-        } label: {
-            Text("登録を取り消す")
-                .font(AppFont.rounded(size: 13, weight: .bold))
-                .foregroundStyle(tokens.textTer)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-        }
-        .buttonStyle(.plain)
-        .padding(.top, 2)
     }
 }

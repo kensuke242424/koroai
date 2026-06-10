@@ -46,8 +46,12 @@ struct ContentView: View {
             if args.contains("-openOnboarding") {
                 store.onboarded = false
             }
-            // 復帰／月替わりリザルトのスクショはホーム（onboarded 済み）が前提。
-            if args.contains("-openReturn") || args.contains("-openMonthResult") {
+            // ホーム前提のスクショ用フックは onboarded 済みにしてから出す。
+            let homeBasedHooks = [
+                "-openReturn", "-openMonthResult", "-openEditFirst", "-openAddSheet",
+                "-openAddDetail", "-openSettings", "-openReview", "-openDigest",
+            ]
+            if homeBasedHooks.contains(where: args.contains) {
                 store.onboarded = true
             }
         }
