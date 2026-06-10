@@ -22,6 +22,8 @@ struct koroaiApp: App {
                     // active → 非 active（background/inactive）へ移るときに再スケジュール。
                     // 在庫はアプリ内でしか変わらないため、この契機＋起動時で網羅できる。
                     if old == .active, new != .active {
+                        // 久しぶり起動・月替わり判定の基準として最終起動日時を記録する。
+                        store.lastOpenedAt = .now
                         Task { await rescheduleNotifications() }
                     }
                 }

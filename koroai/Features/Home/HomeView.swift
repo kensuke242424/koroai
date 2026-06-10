@@ -33,6 +33,21 @@ struct HomeView: View {
     /// 設定（全画面オーバーレイ）。
     @State private var settingsPresented = false
 
+    // MARK: - Step 8 自動表示の状態
+
+    /// 久しぶり起動の復帰画面（全画面オーバーレイ）。
+    @State private var returnPresented = false
+    /// 復帰画面に渡す離脱日数。
+    @State private var daysAway = 0
+    /// 入れ直しシート。
+    @State private var reenterPresented = false
+    /// 月替わりリザルト（nil 以外で全画面表示）。
+    @State private var monthResult: MonthResultData?
+    /// マイルストーン祝福（nil 以外でオーバーレイ表示）。540ms 遅延でセットする。
+    @State private var milestone: Milestone?
+    /// 起動時チェックを一度だけ走らせるためのフラグ。
+    @State private var didRunStartupCheck = false
+
     /// 各画面の動線。closure 注入で後から差し替えやすくしておく。
     /// 注入が無いときの既定: 設定・まとめ・ふりかえり・追加・編集とも本 View が自作画面を開く。
     var onOpenSettings: (() -> Void)? = nil
@@ -40,6 +55,8 @@ struct HomeView: View {
     var onOpenReview: (() -> Void)? = nil
     var onAdd: (() -> Void)? = nil
     var onEditItem: ((FoodItem) -> Void)? = nil
+    /// 設定「使い方ガイド」→ オンボーディング再表示。
+    var onReplayGuide: (() -> Void)? = nil
 
     private var split: HomeSplit { HomeSplitter.split(items: items) }
     private var monthlyAte: Int { Stats.monthlyAteCount(logs: logs) }
@@ -82,13 +99,47 @@ struct HomeView: View {
 
             // 設定（全画面オーバーレイ・最上位）。
             if settingsPresented {
-                SettingsScreen(isPresented: $settingsPresented)
+                SettingsScreen(isPresented: $settingsPresented, onReplayGuide: replayGuide)
                     .transition(.opacity)
                     .zIndex(110)
+            }
+
+            // 入れ直しシート（復帰画面より下・シートとして重ねる）。
+            ReenterSheet(isPresented: $reenterPresented, onConfirmed: { resolveReturnFlow() })
+                .zIndex(115)
+
+            // 久しぶり起動の復帰画面（全画面オーバーレイ）。
+            if returnPresented {
+                ReturnScreen(
+                    daysAway: daysAway,
+                    onReset: returnReset,
+                    onReenter: returnReenter,
+                    onKeep: returnKeep
+                )
+                .transition(.opacity)
+                .zIndex(120)
+            }
+
+            // 月替わりリザルト（全画面オーバーレイ・最上位手前）。
+            if let result = monthResult {
+                MonthResultScreen(result: result, onStart: { startNewMonth(result) })
+                    .transition(.opacity)
+                    .zIndex(130)
+            }
+
+            // マイルストーン祝福（最前面）。
+            if let m = milestone {
+                MilestoneCelebrate(milestone: m, onClose: { milestone = nil })
+                    .transition(.opacity)
+                    .zIndex(140)
             }
         }
         .animation(.easeInOut(duration: 0.28), value: reviewPresented)
         .animation(.easeInOut(duration: 0.28), value: settingsPresented)
+        .animation(.easeInOut(duration: 0.3), value: returnPresented)
+        .animation(.easeInOut(duration: 0.3), value: monthResult)
+        .animation(.easeInOut(duration: 0.28), value: milestone)
+        .task { runStartupCheck() }
         #if DEBUG
         .onAppear { applyAddFlowLaunchHooks() }
         #endif
@@ -117,6 +168,135 @@ struct HomeView: View {
         }
     }
     #endif
+
+    // MARK: - 起動時の自動表示チェック（判断2）
+
+    /// 起動時に一度だけ走る。優先順 (a)→(b)→(c) で自動表示を決め、決着後に lastOpenedAt を更新する。
+    /// onboarded==false は ContentView 側でハンドルするため、ここでは (b) 復帰 / (c) 月替わりを扱う。
+    private func runStartupCheck() {
+        guard !didRunStartupCheck else { return }
+        didRunStartupCheck = true
+
+        #if DEBUG
+        // スクショ用 DEBUG フック。実時間判定をバイパスして特定画面を直接出す。
+        let args = CommandLine.arguments
+        if args.contains("-openMonthResult") {
+            // 先月に ate があるシード（-seedPreviewData）前提で、強制的にリザルトを構築する。
+            if let data = forcedMonthResultForDebug() {
+                monthResult = data
+            }
+            // この場合 lastOpenedAt は更新しない（スクショ専用）。
+            return
+        }
+        if args.contains("-openReturn") {
+            // lastOpenedAt を9日前扱いにして復帰画面を出す。
+            let nineDaysAgo = Calendar.current.date(byAdding: .day, value: -9, to: .now) ?? .now
+            store.lastOpenedAt = nineDaysAgo
+        }
+        #endif
+
+        let now = Date.now
+        let calendar = Calendar.current
+        let decision = AutoSurface.decide(
+            onboarded: store.onboarded,
+            lastOpenedAt: store.lastOpenedAt,
+            logs: logs,
+            monthResultShownFor: store.monthResultShownFor,
+            monthlyResultEnabled: store.showMonthlyResult,
+            now: now,
+            calendar: calendar
+        )
+
+        switch decision {
+        case .onboarding, .none:
+            // (a) は ContentView で処理済み。何も出さない場合はそのまま lastOpenedAt を更新。
+            store.lastOpenedAt = now
+        case .returning(let away):
+            // (b) 復帰: コピーを真にするため、期限切れ食材を「ログを書かずに」片付ける。
+            ReturnActions.purgeExpired(context: context, now: now, calendar: calendar)
+            daysAway = away
+            returnPresented = true
+            // lastOpenedAt は復帰フロー解決後に更新する（resolveReturnFlow）。
+        case .monthResult(let data):
+            // (c) 月替わりリザルト。閉じるときに shownFor / lastOpenedAt を更新する。
+            monthResult = data
+        }
+    }
+
+    // MARK: - 復帰フローの出口（判断3）
+
+    /// 「リセットしてまっさらに」: 食材のみ全削除（記録ログは保持）＋トースト。
+    private func returnReset() {
+        ReturnActions.resetItemsOnly(context: context)
+        toast.show(.toss, "リセットしました。ゆっくり始めましょう")
+        returnPresented = false
+        resolveReturnFlow()
+    }
+
+    /// 「今ある物だけ入れ直す」: 入れ直しシートへ。
+    private func returnReenter() {
+        returnPresented = false
+        reenterPresented = true
+    }
+
+    /// 「このまま続ける」: 残り（未期限切れ）を保持して閉じる。
+    private func returnKeep() {
+        returnPresented = false
+        resolveReturnFlow()
+    }
+
+    /// 復帰フローが解決したあと: lastOpenedAt を更新し、月替わりリザルトを再評価する（判断2 後段）。
+    private func resolveReturnFlow() {
+        let now = Date.now
+        let calendar = Calendar.current
+        if let data = MonthResultTrigger.evaluate(
+            lastOpenedAt: store.lastOpenedAt,
+            logs: logs,
+            shownFor: store.monthResultShownFor,
+            enabled: store.showMonthlyResult,
+            now: now,
+            calendar: calendar
+        ) {
+            monthResult = data
+            // monthResult を閉じるときに lastOpenedAt を更新する。
+        } else {
+            store.lastOpenedAt = now
+        }
+    }
+
+    // MARK: - 月替わりリザルトの出口（判断1）
+
+    /// 「{次月}月をはじめる」: shownFor を先月キーに更新し、lastOpenedAt も更新して閉じる。
+    /// カウンタリセットは不要（全てログ導出。月が替われば当月件数は自動で0）。
+    private func startNewMonth(_ result: MonthResultData) {
+        store.monthResultShownFor = result.monthKey
+        store.lastOpenedAt = .now
+        monthResult = nil
+    }
+
+    #if DEBUG
+    /// スクショ用: 先月の ate ログから強制的に MonthResultData を組み立てる（実時間判定を無視）。
+    private func forcedMonthResultForDebug() -> MonthResultData? {
+        let now = Date.now
+        let calendar = Calendar.current
+        // lastOpenedAt を先月扱いにして evaluate に通す（shownFor / enabled はバイパス）。
+        guard let lastMonth = calendar.date(byAdding: .month, value: -1, to: now) else { return nil }
+        return MonthResultTrigger.evaluate(
+            lastOpenedAt: lastMonth,
+            logs: logs,
+            shownFor: nil,
+            enabled: true,
+            now: now,
+            calendar: calendar
+        )
+    }
+    #endif
+
+    /// 設定「使い方ガイド」からの再表示。設定を閉じてからオンボーディングを出す。
+    private func replayGuide() {
+        settingsPresented = false
+        onReplayGuide?()
+    }
 
     // MARK: - コンパクトナビバー（常設）
 
@@ -376,16 +556,27 @@ struct HomeView: View {
 
     private func ate(_ item: FoodItem) {
         let catId = item.catId
+        // insert 前の通算（lifetime）を控えておく（マイルストーン判定用）。
+        let lifetimeBefore = Stats.lifetimeAteCount(logs: logs)
         context.delete(item)
         context.insert(ConsumptionLog(catId: catId, action: .ate))
         try? context.save()
+        let allLogs = (try? context.fetch(FetchDescriptor<ConsumptionLog>())) ?? []
         // 処理後の当月件数（クエリ導出と同じになるよう再計算）
-        let n = Stats.monthlyAteCount(logs: ((try? context.fetch(FetchDescriptor<ConsumptionLog>())) ?? []))
+        let n = Stats.monthlyAteCount(logs: allLogs)
+        let lifetimeAfter = Stats.lifetimeAteCount(logs: allLogs)
         // praise 再抽選（直前と重複回避）
         withAnimation(.easeIn(duration: 0.32)) {
             praiseTemplate = HomeCopy.pickPraise(avoiding: praiseTemplate)
         }
         toast.show(.ate, ateMessage(count: n))
+        // マイルストーンを新たに跨いだら、540ms 後に祝福オーバーレイを出す（出典: fk-app.jsx onAte）。
+        if let crossed = Milestones.crossed(prev: lifetimeBefore, next: lifetimeAfter) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(540))
+                milestone = crossed
+            }
+        }
     }
 
     private func toss(_ item: FoodItem) {

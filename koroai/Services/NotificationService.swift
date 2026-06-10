@@ -52,6 +52,10 @@ final class NotificationService {
 
     /// 通知許可を確認し、未確定なら要求する。許可されていれば true。
     private func ensureAuthorized() async -> Bool {
+        #if DEBUG
+        // スクショ時は権限ダイアログが UI に被るので、どの経路から来ても要求しない（本番挙動には影響なし）。
+        if CommandLine.arguments.contains("-noNotifyPrompt") { return false }
+        #endif
         let status = await center.notificationSettings().authorizationStatus
         switch status {
         case .authorized, .provisional, .ephemeral:

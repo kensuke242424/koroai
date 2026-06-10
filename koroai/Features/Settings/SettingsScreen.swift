@@ -16,6 +16,8 @@ import SwiftData
 
 struct SettingsScreen: View {
     @Binding var isPresented: Bool
+    /// 「使い方ガイド」→ オンボーディング再表示。HomeView/ContentView が処理する。
+    var onReplayGuide: (() -> Void)? = nil
 
     @Environment(\.tokens) private var tokens
     @Environment(AppStore.self) private var store
@@ -199,7 +201,13 @@ struct SettingsScreen: View {
                 icon: nil,
                 label: "月替わりリザルトを表示",
                 sub: "月初に先月の結果をポップアップ",
-                isOn: $store.showMonthlyResult,
+                isOn: $store.showMonthlyResult
+            )
+            SettingsToggleRow(
+                icon: nil,
+                label: "リザルトに称号を表示",
+                sub: "月替わりリザルトにランクを出す",
+                isOn: $store.showResultRank,
                 isLast: true
             )
         }
@@ -235,8 +243,8 @@ struct SettingsScreen: View {
                     label: "使い方ガイド",
                     sub: "オンボーディングをもう一度"
                 ) {
-                    // TODO(Step 8): オンボーディング再生。
-                    toast.show(.toss, "準備中です")
+                    // オンボーディング再表示（再生時も同じ投入挙動）。
+                    onReplayGuide?()
                 }
                 SettingsTapRow(
                     icon: "envelope",

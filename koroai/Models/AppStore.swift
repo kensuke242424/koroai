@@ -24,6 +24,10 @@ final class AppStore {
         static let digestMinute = "settings.digestMinute"
         static let leadDays = "settings.leadDays"
         static let showMonthlyResult = "settings.showMonthlyResult"
+        static let showResultRank = "settings.showResultRank"
+        static let lastOpenedAt = "app.lastOpenedAt"
+        static let monthResultShownFor = "app.monthResultShownFor"
+        static let onboarded = "app.onboarded"
     }
 
     var themeMode: ThemeMode {
@@ -76,6 +80,31 @@ final class AppStore {
         didSet { defaults.set(showMonthlyResult, forKey: Keys.showMonthlyResult) }
     }
 
+    /// 月替わりリザルトに称号（ランクバッジ）を表示するか。既定 true。
+    /// 出典: tweaks-panel.jsx「月替わりリザルトに称号を表示」(showRank)。
+    /// showMonthlyResult（リザルト自体の ON/OFF）とは別物。
+    var showResultRank: Bool {
+        didSet { defaults.set(showResultRank, forKey: Keys.showResultRank) }
+    }
+
+    // MARK: - 自動表示の進行状態（Step 8）
+
+    /// 最後にアプリを開いた日時。月替わり判定（暦月比較）と久しぶり起動判定（暦日差）に使う。
+    /// 更新は koroaiApp の scenePhase 監視（active→非active）と起動チェック完了後。
+    var lastOpenedAt: Date? {
+        didSet { defaults.set(lastOpenedAt, forKey: Keys.lastOpenedAt) }
+    }
+
+    /// 月替わりリザルトを最後に見せた対象月キー（"YYYY-MM"）。二重表示を防ぐ。
+    var monthResultShownFor: String? {
+        didSet { defaults.set(monthResultShownFor, forKey: Keys.monthResultShownFor) }
+    }
+
+    /// オンボーディング済みか。既定 false。完了/スキップで true。
+    var onboarded: Bool {
+        didSet { defaults.set(onboarded, forKey: Keys.onboarded) }
+    }
+
     /// 残量モードのカテゴリ別上書き（README「選んだモードは記憶」）。
     /// catId → AmountMode.rawValue の辞書として UserDefaults に永続化する。
     /// 詳細を開くときの初期モード = override ?? カテゴリ既定。詳細でモードを切り替えたら更新する。
@@ -101,6 +130,11 @@ final class AppStore {
         digestMinute = defaults.object(forKey: Keys.digestMinute) as? Int ?? 0
         leadDays = defaults.object(forKey: Keys.leadDays) as? Int ?? 1
         showMonthlyResult = defaults.object(forKey: Keys.showMonthlyResult) as? Bool ?? true
+        showResultRank = defaults.object(forKey: Keys.showResultRank) as? Bool ?? true
+        // Step 8: 自動表示の進行状態。lastOpenedAt は未起動なら nil。
+        lastOpenedAt = defaults.object(forKey: Keys.lastOpenedAt) as? Date
+        monthResultShownFor = defaults.string(forKey: Keys.monthResultShownFor)
+        onboarded = defaults.object(forKey: Keys.onboarded) as? Bool ?? false
     }
 
     // MARK: - 残量モードの記憶
