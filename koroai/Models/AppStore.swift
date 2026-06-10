@@ -19,6 +19,11 @@ final class AppStore {
         static let showAchievementCard = "settings.showAchievementCard"
         static let showWeeklySummary = "settings.showWeeklySummary"
         static let amountModeOverrides = "settings.amountModeOverrides"
+        static let notificationsEnabled = "settings.notificationsEnabled"
+        static let digestHour = "settings.digestHour"
+        static let digestMinute = "settings.digestMinute"
+        static let leadDays = "settings.leadDays"
+        static let showMonthlyResult = "settings.showMonthlyResult"
     }
 
     var themeMode: ThemeMode {
@@ -43,6 +48,34 @@ final class AppStore {
         didSet { defaults.set(showWeeklySummary, forKey: Keys.showWeeklySummary) }
     }
 
+    // MARK: - 通知設定（Step 7）
+
+    /// うちのスケジューリングの ON/OFF（OS の権限とは別）。既定 true。
+    /// false にしたら全 pending を取り消す（再スケジュール契機で空 plan が登録される）。
+    var notificationsEnabled: Bool {
+        didSet { defaults.set(notificationsEnabled, forKey: Keys.notificationsEnabled) }
+    }
+
+    /// 朝のまとめ通知の発火時刻（時）。既定 8。
+    var digestHour: Int {
+        didSet { defaults.set(digestHour, forKey: Keys.digestHour) }
+    }
+
+    /// 朝のまとめ通知の発火時刻（分）。既定 0。
+    var digestMinute: Int {
+        didSet { defaults.set(digestMinute, forKey: Keys.digestMinute) }
+    }
+
+    /// 期限前通知を「何日前」に出すか。0=当日 / 1 / 2 / 3。既定 1。
+    var leadDays: Int {
+        didSet { defaults.set(leadDays, forKey: Keys.leadDays) }
+    }
+
+    /// 月替わりリザルトを表示するか。既定 true。UI は Step 7 で先行、使用は Step 8。
+    var showMonthlyResult: Bool {
+        didSet { defaults.set(showMonthlyResult, forKey: Keys.showMonthlyResult) }
+    }
+
     /// 残量モードのカテゴリ別上書き（README「選んだモードは記憶」）。
     /// catId → AmountMode.rawValue の辞書として UserDefaults に永続化する。
     /// 詳細を開くときの初期モード = override ?? カテゴリ既定。詳細でモードを切り替えたら更新する。
@@ -62,6 +95,12 @@ final class AppStore {
         showAchievementCard = defaults.object(forKey: Keys.showAchievementCard) as? Bool ?? true
         showWeeklySummary = defaults.object(forKey: Keys.showWeeklySummary) as? Bool ?? true
         amountModeOverrides = (defaults.dictionary(forKey: Keys.amountModeOverrides) as? [String: String]) ?? [:]
+        // 通知設定の既定: notificationsEnabled true / digest 8:00 / leadDays 1 / showMonthlyResult true
+        notificationsEnabled = defaults.object(forKey: Keys.notificationsEnabled) as? Bool ?? true
+        digestHour = defaults.object(forKey: Keys.digestHour) as? Int ?? 8
+        digestMinute = defaults.object(forKey: Keys.digestMinute) as? Int ?? 0
+        leadDays = defaults.object(forKey: Keys.leadDays) as? Int ?? 1
+        showMonthlyResult = defaults.object(forKey: Keys.showMonthlyResult) as? Bool ?? true
     }
 
     // MARK: - 残量モードの記憶

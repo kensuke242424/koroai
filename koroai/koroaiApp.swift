@@ -4,13 +4,37 @@ import SwiftData
 @main
 struct koroaiApp: App {
     @State private var store = AppStore()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(store)
+                .task {
+                    // 起動時に一度スケジュールする（権限は遅延要求）。
+                    #if DEBUG
+                    // スクショ時は権限ダイアログが UI に被るので抑止する（本番挙動には影響なし）。
+                    if CommandLine.arguments.contains("-noNotifyPrompt") { return }
+                    #endif
+                    await rescheduleNotifications()
+                }
+                .onChange(of: scenePhase) { old, new in
+                    // active → 非 active（background/inactive）へ移るときに再スケジュール。
+                    // 在庫はアプリ内でしか変わらないため、この契機＋起動時で網羅できる。
+                    if old == .active, new != .active {
+                        Task { await rescheduleNotifications() }
+                    }
+                }
         }
         .modelContainer(container)
+    }
+
+    /// mainContext から FoodItem を fetch して通知を再スケジュールする。
+    @MainActor
+    private func rescheduleNotifications() async {
+        let context = container.mainContext
+        let items = (try? context.fetch(FetchDescriptor<FoodItem>())) ?? []
+        await NotificationService.shared.rescheduleAll(items: items, store: store)
     }
 
     /// 永続コンテナ。FoodItem / ConsumptionLog を扱う。

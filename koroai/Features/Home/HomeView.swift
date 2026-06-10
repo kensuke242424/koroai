@@ -5,7 +5,7 @@
 //   今週の食材リスト / ゆとりありセクション / FAB。
 //
 // 食べた/捨てた処理は本 View に集約: SwiftData 操作 + ToastCenter + praise 再抽選（達成数はクエリ導出）。
-// 未実装画面（設定・まとめ・ふりかえり・追加・編集）は UI を作り、タップで「準備中です」トースト。
+// 各画面（設定・まとめ・ふりかえり・追加・編集）は本 View が自作画面を開く（注入があればそちら優先）。
 
 import SwiftUI
 import SwiftData
@@ -30,10 +30,11 @@ struct HomeView: View {
     @State private var digestPresented = false
     /// ふりかえり（全画面オーバーレイ）。
     @State private var reviewPresented = false
+    /// 設定（全画面オーバーレイ）。
+    @State private var settingsPresented = false
 
     /// 各画面の動線。closure 注入で後から差し替えやすくしておく。
-    /// 注入が無いときの既定: 設定は「準備中です」トースト（Step 7）。
-    /// まとめ／ふりかえり／追加／編集は本 View が自作画面を開く。
+    /// 注入が無いときの既定: 設定・まとめ・ふりかえり・追加・編集とも本 View が自作画面を開く。
     var onOpenSettings: (() -> Void)? = nil
     var onOpenDigest: (() -> Void)? = nil
     var onOpenReview: (() -> Void)? = nil
@@ -78,8 +79,16 @@ struct HomeView: View {
                     .transition(.opacity)
                     .zIndex(100)
             }
+
+            // 設定（全画面オーバーレイ・最上位）。
+            if settingsPresented {
+                SettingsScreen(isPresented: $settingsPresented)
+                    .transition(.opacity)
+                    .zIndex(110)
+            }
         }
         .animation(.easeInOut(duration: 0.28), value: reviewPresented)
+        .animation(.easeInOut(duration: 0.28), value: settingsPresented)
         #if DEBUG
         .onAppear { applyAddFlowLaunchHooks() }
         #endif
@@ -102,6 +111,9 @@ struct HomeView: View {
         }
         if args.contains("-openDigest") {
             digestPresented = true
+        }
+        if args.contains("-openSettings") {
+            settingsPresented = true
         }
     }
     #endif
@@ -128,7 +140,7 @@ struct HomeView: View {
 
             // 設定ボタン（34pt 円・surface2・太陽風・タップ領域44）
             Button {
-                fire(onOpenSettings) // TODO(Step 7): 設定画面へ
+                openSettings()
             } label: {
                 Image(systemName: "sun.max")
                     .font(.system(size: 16, weight: .medium))
@@ -429,12 +441,12 @@ struct HomeView: View {
         }
     }
 
-    /// 未実装動線: closure があれば呼ぶ、なければ「準備中です」トースト（現状は設定のみ＝Step 7）。
-    private func fire(_ action: (() -> Void)?) {
-        if let action {
-            action()
+    /// 設定動線。onOpenSettings 注入があれば優先、なければ全画面オーバーレイを開く。
+    private func openSettings() {
+        if let onOpenSettings {
+            onOpenSettings()
         } else {
-            toast.show(.toss, "準備中です")
+            settingsPresented = true
         }
     }
 
