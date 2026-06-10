@@ -17,6 +17,7 @@ final class AppStore {
         static let palette = "settings.palette"
         static let tone = "settings.tone"
         static let showAchievementCard = "settings.showAchievementCard"
+        static let showWeeklySummary = "settings.showWeeklySummary"
         static let amountModeOverrides = "settings.amountModeOverrides"
     }
 
@@ -36,6 +37,12 @@ final class AppStore {
         didSet { defaults.set(showAchievementCard, forKey: Keys.showAchievementCard) }
     }
 
+    /// ふりかえり内の週次サマリー（先週のふりかえり）を表示するか。既定 true。
+    /// 設定 UI は Step 7。
+    var showWeeklySummary: Bool {
+        didSet { defaults.set(showWeeklySummary, forKey: Keys.showWeeklySummary) }
+    }
+
     /// 残量モードのカテゴリ別上書き（README「選んだモードは記憶」）。
     /// catId → AmountMode.rawValue の辞書として UserDefaults に永続化する。
     /// 詳細を開くときの初期モード = override ?? カテゴリ既定。詳細でモードを切り替えたら更新する。
@@ -53,6 +60,7 @@ final class AppStore {
         palette = (defaults.string(forKey: Keys.palette)).flatMap(Palette.init(rawValue:)) ?? .hinoki
         tone = (defaults.string(forKey: Keys.tone)).flatMap(Tone.init(rawValue:)) ?? .gentle
         showAchievementCard = defaults.object(forKey: Keys.showAchievementCard) as? Bool ?? true
+        showWeeklySummary = defaults.object(forKey: Keys.showWeeklySummary) as? Bool ?? true
         amountModeOverrides = (defaults.dictionary(forKey: Keys.amountModeOverrides) as? [String: String]) ?? [:]
     }
 

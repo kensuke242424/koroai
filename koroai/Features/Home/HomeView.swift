@@ -26,10 +26,14 @@ struct HomeView: View {
     /// 編集シートの対象。行/ヒーローのタップで設定し、nil 以外なら editSheetPresented を開く。
     @State private var editingItem: FoodItem?
     @State private var editSheetPresented = false
+    /// 今朝のまとめシート。
+    @State private var digestPresented = false
+    /// ふりかえり（全画面オーバーレイ）。
+    @State private var reviewPresented = false
 
-    /// 設定・まとめ・ふりかえり・追加・編集など未実装画面の動線。
-    /// closure 注入で後から差し替えやすくしておく（既定は「準備中です」トースト）。
-    /// TODO(Step 4〜7): 各 closure を実画面の表示に差し替える。
+    /// 各画面の動線。closure 注入で後から差し替えやすくしておく。
+    /// 注入が無いときの既定: 設定は「準備中です」トースト（Step 7）。
+    /// まとめ／ふりかえり／追加／編集は本 View が自作画面を開く。
     var onOpenSettings: (() -> Void)? = nil
     var onOpenDigest: (() -> Void)? = nil
     var onOpenReview: (() -> Void)? = nil
@@ -64,7 +68,18 @@ struct HomeView: View {
                 onAte: ate(_:),
                 onToss: toss(_:)
             )
+
+            // 今朝のまとめシート。
+            DigestSheet(isPresented: $digestPresented)
+
+            // ふりかえり（全画面オーバーレイ・最上位）。出入りは opacity。
+            if reviewPresented {
+                ReviewScreen(isPresented: $reviewPresented)
+                    .transition(.opacity)
+                    .zIndex(100)
+            }
         }
+        .animation(.easeInOut(duration: 0.28), value: reviewPresented)
         #if DEBUG
         .onAppear { applyAddFlowLaunchHooks() }
         #endif
@@ -81,6 +96,12 @@ struct HomeView: View {
         }
         if args.contains("-openEditFirst"), let first = items.first {
             openEdit(first)
+        }
+        if args.contains("-openReview") {
+            reviewPresented = true
+        }
+        if args.contains("-openDigest") {
+            digestPresented = true
         }
     }
     #endif
@@ -232,7 +253,7 @@ struct HomeView: View {
 
     private var digestChip: some View {
         Button {
-            fire(onOpenDigest) // TODO(Step 6): 今朝のまとめへ
+            openDigest()
         } label: {
             HStack(spacing: 6) {
                 ZStack(alignment: .topTrailing) {
@@ -264,7 +285,7 @@ struct HomeView: View {
 
     private var achievementCard: some View {
         Button {
-            fire(onOpenReview) // TODO(Step 6): ふりかえりへ
+            openReview()
         } label: {
             HStack(spacing: 15) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
@@ -390,17 +411,31 @@ struct HomeView: View {
         editSheetPresented = true
     }
 
-    /// 未実装動線: closure があれば呼ぶ、なければ「準備中です」トースト。
+    /// 今朝のまとめ動線。onOpenDigest 注入があれば優先、なければ自作シートを開く。
+    private func openDigest() {
+        if let onOpenDigest {
+            onOpenDigest()
+        } else {
+            digestPresented = true
+        }
+    }
+
+    /// ふりかえり動線。onOpenReview 注入があれば優先、なければ全画面オーバーレイを開く。
+    private func openReview() {
+        if let onOpenReview {
+            onOpenReview()
+        } else {
+            reviewPresented = true
+        }
+    }
+
+    /// 未実装動線: closure があれば呼ぶ、なければ「準備中です」トースト（現状は設定のみ＝Step 7）。
     private func fire(_ action: (() -> Void)?) {
         if let action {
             action()
         } else {
             toast.show(.toss, "準備中です")
         }
-    }
-
-    private func fire(_ action: () -> Void) {
-        action()
     }
 
     private func clamp01(_ x: CGFloat) -> CGFloat { min(max(x, 0), 1) }
