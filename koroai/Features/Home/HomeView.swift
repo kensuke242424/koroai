@@ -152,7 +152,8 @@ struct HomeView: View {
     /// -openEditFirst で先頭アイテムの編集シートを初期表示する。
     private func applyAddFlowLaunchHooks() {
         let args = CommandLine.arguments
-        if args.contains("-openAddSheet") || args.contains("-openAddDetail") {
+        if args.contains("-openAddSheet") || args.contains("-openAddDetail")
+            || args.contains("-openAddDetailDelayed") {
             addFlowPresented = true
         }
         if args.contains("-openEditFirst"), let first = items.first {

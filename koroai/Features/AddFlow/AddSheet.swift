@@ -103,11 +103,21 @@ struct AddSheet: View {
 
     #if DEBUG
     /// -openAddDetail <catId> が渡されたら、そのカテゴリの詳細入力まで開く（スクショ用）。
+    /// -openAddDetailDelayed <catId> は初回描画の後に開く（タイルタップと同じ
+    /// 「表示後の state 変更」経路を再現するための検証フック）。
     private func applyDetailLaunchHook() {
         let args = CommandLine.arguments
-        guard let i = args.firstIndex(of: "-openAddDetail"), i + 1 < args.count,
-              let cat = FoodCategory.find(args[i + 1]) else { return }
-        model.openAdd(category: cat, store: store)
+        if let i = args.firstIndex(of: "-openAddDetail"), i + 1 < args.count,
+           let cat = FoodCategory.find(args[i + 1]) {
+            model.openAdd(category: cat, store: store)
+            return
+        }
+        if let i = args.firstIndex(of: "-openAddDetailDelayed"), i + 1 < args.count,
+           let cat = FoodCategory.find(args[i + 1]) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                model.openAdd(category: cat, store: store)
+            }
+        }
     }
     #endif
 
@@ -123,20 +133,15 @@ struct AddSheet: View {
     }
 
     // ヘッダー
+    // 説明サブ文言（タイルを選ぶと登録画面へ…）はユーザー判断で削除（表示幅を優先）。
     private var header: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(copy.addTitle)
-                .font(AppFont.rounded(size: 22, weight: .heavy))
-                .foregroundStyle(tokens.text)
-            Text("タイルを選ぶと登録画面へ。かごに溜めて、最後にまとめて登録。")
-                .font(AppFont.rounded(size: 13.5, weight: .semibold))
-                .foregroundStyle(tokens.textSec)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 22)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
+        Text(copy.addTitle)
+            .font(AppFont.rounded(size: 22, weight: .heavy))
+            .foregroundStyle(tokens.text)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 22)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
     }
 
     // かごバー（0品から表示）
@@ -435,13 +440,19 @@ struct AddSheet: View {
     /// 高さ計測（PreferenceKey）は新しい OS で発火しないことがあるため、
     /// ViewThatFits で「収まるなら素のフォーム（内容フィット）／溢れたらスクロール」に切り替える。
     private func detailPanel(maxHeight: CGFloat) -> some View {
+        // 注意: ここで .frame(maxHeight:) を使ってはいけない。
+        // frame(max〜:) は「上限まで広がる」挙動（maxWidth: .infinity と同じ規則）のため、
+        // 中身が小さくてもパネルが上限高に膨らみ、中身が上下センタリングされて
+        // 大きな余白ができる。上限はスクロール枝にだけ固定高で持たせる。
         ViewThatFits(in: .vertical) {
+            // 収まるなら素のフォーム（内容フィット）
             DetailForm(model: model, isEditing: model.editingId != nil)
+            // 溢れたら（カレンダー展開時等）スクロールに切替（高さは 94% 固定）
             ScrollView {
                 DetailForm(model: model, isEditing: model.editingId != nil)
             }
+            .frame(height: maxHeight)
         }
-        .frame(maxHeight: maxHeight)
         .background {
             // 背景はホームインジケータ領域まで延長（SheetContainer と同じ扱い）。
             UnevenRoundedRectangle(
