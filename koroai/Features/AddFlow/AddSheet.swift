@@ -48,8 +48,8 @@ struct AddSheet: View {
     @Environment(\.modelContext) private var context
 
     @State private var model = AddFlowModel()
-    /// 詳細入力パネルの内容高さ（コンテンツフィット用に測る）。
-    @State private var detailContentHeight: CGFloat = 0
+    /// かごバーの遅延競り上がり用。シート本体より一拍遅れて「ひょこっ」と出す。
+    @State private var ctaBarVisible = false
 
     private var copy: ToneCopy { store.tone.copy }
 
@@ -72,19 +72,33 @@ struct AddSheet: View {
         .onChange(of: isPresented) { _, presented in
             if presented {
                 model.reset()
+                popInCtaBar()
                 #if DEBUG
                 applyDetailLaunchHook()
                 #endif
+            } else {
+                ctaBarVisible = false
             }
         }
         #if DEBUG
         .onAppear {
             if isPresented {
                 model.reset()
+                popInCtaBar()
                 applyDetailLaunchHook()
             }
         }
         #endif
+    }
+
+    /// かごバーをシート本体より一拍（0.22秒）遅らせて競り上げる。
+    private func popInCtaBar() {
+        ctaBarVisible = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
+                ctaBarVisible = true
+            }
+        }
     }
 
     #if DEBUG
@@ -388,6 +402,8 @@ struct AddSheet: View {
         .overlay(alignment: .top) {
             Rectangle().fill(tokens.hair).frame(height: 1)
         }
+        // シート本体より一拍遅れて下から「ひょこっ」と競り上がる（ユーザー指定の演出）。
+        .offset(y: ctaBarVisible ? 0 : 140)
     }
 
     // MARK: - 詳細オーバーレイ
@@ -416,18 +432,15 @@ struct AddSheet: View {
     }
 
     /// パネル高さは内容にフィットさせる（maxHeight 94% まで。プロトタイプの maxHeight: '94%' 相当）。
-    /// 全高に広げると内容の下に大きな余白ができるため、内容高さを測って frame を絞る。
+    /// 高さ計測（PreferenceKey）は新しい OS で発火しないことがあるため、
+    /// ViewThatFits で「収まるなら素のフォーム（内容フィット）／溢れたらスクロール」に切り替える。
     private func detailPanel(maxHeight: CGFloat) -> some View {
-        ScrollView {
+        ViewThatFits(in: .vertical) {
             DetailForm(model: model, isEditing: model.editingId != nil)
-                .background(
-                    GeometryReader { g in
-                        Color.clear.preference(key: DetailContentHeightKey.self, value: g.size.height)
-                    }
-                )
+            ScrollView {
+                DetailForm(model: model, isEditing: model.editingId != nil)
+            }
         }
-        .onPreferenceChange(DetailContentHeightKey.self) { detailContentHeight = $0 }
-        .frame(height: detailContentHeight > 0 ? min(detailContentHeight, maxHeight) : nil)
         .frame(maxHeight: maxHeight)
         .background {
             // 背景はホームインジケータ領域まで延長（SheetContainer と同じ扱い）。
@@ -521,14 +534,5 @@ struct AddSheet: View {
         if model.requestClose() {
             isPresented = false
         }
-    }
-}
-
-// MARK: - 詳細パネルの内容高さ計測用 PreferenceKey
-
-private struct DetailContentHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
     }
 }
