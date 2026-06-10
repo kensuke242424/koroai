@@ -14,32 +14,14 @@ extension Color {
         let a = C * cos(hRad)
         let b = C * sin(hRad)
 
-        // 2. Lab -> LMS'（立方根空間）
-        let lp = L + 0.3963377774 * a + 0.2158037573 * b
-        let mp = L - 0.1055613458 * a - 0.0638541728 * b
-        let sp = L - 0.0894841775 * a - 1.2914855480 * b
+        // 2. OKLab -> 線形 sRGB（共通ヘルパーに委譲。ColorMix と同一系を使う）
+        let lin = OKLab.toLinearSRGB(L: L, a: a, b: b)
 
-        // 3. 立方
-        let l = lp * lp * lp
-        let m = mp * mp * mp
-        let s = sp * sp * sp
-
-        // 4. LMS -> 線形 sRGB
-        let rLin = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s
-        let gLin = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s
-        let bLin = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
-
-        // 5. ガンマ補正 + clamp
-        func gamma(_ c: Double) -> Double {
-            let v = c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055
-            return min(max(v, 0), 1)
-        }
-
-        // 6. sRGB Color
+        // 3. ガンマ補正 + clamp -> sRGB Color
         self.init(.sRGB,
-                  red: gamma(rLin),
-                  green: gamma(gLin),
-                  blue: gamma(bLin),
+                  red: OKLab.toGamma(lin.r),
+                  green: OKLab.toGamma(lin.g),
+                  blue: OKLab.toGamma(lin.bb),
                   opacity: opacity)
     }
 }
