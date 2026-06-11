@@ -20,6 +20,7 @@ enum SheetDetent {
     case large
 }
 
+
 struct SheetContainer<Content: View>: View {
     @Binding var isPresented: Bool
     /// シート高さの画面比（0...1）。nil なら内容にフィット（maxHeight 88% まで）。
@@ -32,6 +33,10 @@ struct SheetContainer<Content: View>: View {
     var extendContentUnderHomeIndicator: Bool = false
     /// スクリムタップ時の要求（即閉じではない）。nil なら isPresented を false にする既定動作。
     var onDismissRequest: (() -> Void)?
+    /// パネル全体の detent ドラッグが進行中（＋指を離した直後の猶予）かどうかを親へ伝える。
+    /// シートが指に追従して動くため、ローカル座標では移動量ほぼゼロ＝離した地点の
+    /// ボタンにタップ判定が入ってしまう。親はタップ系アクションをこのフラグで抑止する。
+    var detentDragActive: Binding<Bool>? = nil
     @ViewBuilder var content: () -> Content
 
     @Environment(\.tokens) private var tokens
@@ -42,6 +47,8 @@ struct SheetContainer<Content: View>: View {
     /// パネル全体ドラッグ（先勝ち）の係合状態。nil＝未判定、true＝縦ドラッグとして係合、false＝横優勢で見送り。
     /// 1ジェスチャ内で1度だけ判定する（初動の縦横で確定）。
     @State private var panelDragEngaged: Bool?
+    /// 猶予クリアの世代カウンタ（次のドラッグが始まったら古いクリア予約を無効化する）。
+    @State private var suppressGeneration = 0
 
     // 出典: fk-ui.jsx FKSheet スクリム rgba(20,14,6,0.34)。
     private static var scrim: Color { Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.34) }
@@ -199,6 +206,10 @@ struct SheetContainer<Content: View>: View {
                     }
                     // 縦優勢のときだけ係合（横／斜めは見送り）。
                     panelDragEngaged = abs(value.translation.height) > abs(value.translation.width)
+                    if panelDragEngaged == true {
+                        detentDragActive?.wrappedValue = true
+                        suppressGeneration += 1
+                    }
                 }
                 guard panelDragEngaged == true else { return }
                 applyDetentDrag(translationY: value.translation.height)
@@ -208,6 +219,14 @@ struct SheetContainer<Content: View>: View {
                 panelDragEngaged = nil
                 guard engaged else { return }
                 snapDetent(geoHeight: geoHeight, translationY: value.translation.height)
+                // タップ抑止は離した直後のタップ判定が流れ込むまで少し残す。
+                suppressGeneration += 1
+                let generation = suppressGeneration
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    if suppressGeneration == generation {
+                        detentDragActive?.wrappedValue = false
+                    }
+                }
             }
     }
 

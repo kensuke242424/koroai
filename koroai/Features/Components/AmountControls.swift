@@ -88,7 +88,9 @@ struct AmountSlider: View {
     private var fillColor: Color { Color.fillColor(fraction: frac, tokens: tokens) }
     private var current: AmountStop { AmountStops.nearest(to: frac) }
 
-    private let trackInset: CGFloat = 6   // 出典: fk-ui.jsx left:6 right:6
+    // 出典は fk-ui.jsx left:6 right:6 だが、ボックスなし文脈（ConfirmItemCard）では
+    // 端のノブ（半径14）が clipped に切られるため、ノブ半径分インセットして見切れを防ぐ。
+    private let trackInset: CGFloat = 14
     private let knob: CGFloat = 28
 
     var body: some View {

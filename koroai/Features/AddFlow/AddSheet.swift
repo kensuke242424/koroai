@@ -20,6 +20,8 @@ struct AddSheet: View {
     @Environment(AppStore.self) private var store
     @Environment(ToastCenter.self) private var toast
     @Environment(\.modelContext) private var context
+    /// SheetContainer の detent ドラッグ中フラグ（離し際のタップ流れ込み抑止）。
+    @State private var sheetDragging = false
 
     @State private var model = AddFlowModel()
     /// シートの detent（中⇄大）。初期は中、確認画面へ進むと自動で大（参照HTML準拠）。
@@ -36,7 +38,8 @@ struct AddSheet: View {
                 detentFractions: (medium: 0.68, large: 1.0), // 中68%⇄大は最大（セーフエリア上端）まで
                 detent: $detent,
                 extendContentUnderHomeIndicator: true, // 下部トレイを画面下端まで敷く（デザイン準拠）
-                onDismissRequest: { handleDismiss() }
+                onDismissRequest: { handleDismiss() },
+                detentDragActive: $sheetDragging
             ) {
                 track
             }
@@ -112,6 +115,8 @@ struct AddSheet: View {
     private func isCollapsed(_ id: String) -> Bool { collapsedSections.contains(id) }
 
     private func toggleSection(_ id: String) {
+        // detent ドラッグの離し際に「離した地点のボタン」へタップ判定が流れ込むのを抑止。
+        guard !sheetDragging else { return }
         withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
             if collapsedSections.contains(id) {
                 collapsedSections.remove(id)
@@ -396,6 +401,8 @@ struct AddSheet: View {
     /// すべてアニメーションするよう、変異は必ず withAnimation で包む
     /// （.animation(value:) 直付けだけではトレイ高さの変化を取りこぼす）。
     private func toggleAnimated(_ preset: IngredientPreset) {
+        // detent ドラッグの離し際のタップ流れ込みを抑止（toggleSection と同様）。
+        guard !sheetDragging else { return }
         withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
             model.toggle(preset: preset, store: store)
         }
@@ -483,10 +490,9 @@ struct AddSheet: View {
             }
             // 「確認する（N品）」CTA。
             Button {
-                if n > 0 {
-                    withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
-                        model.screen = .confirm
-                    }
+                guard !sheetDragging, n > 0 else { return }
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                    model.screen = .confirm
                 }
             } label: {
                 Text(n > 0 ? "確認する（\(n)品）" : "確認する")
@@ -568,6 +574,7 @@ struct AddSheet: View {
                     .foregroundStyle(tokens.text)
                     .fixedSize()
                 Button {
+                    guard !sheetDragging else { return }
                     withAnimation(.spring(response: 0.36, dampingFraction: 0.7)) {
                         model.removePreset(g.presetId)
                     }
@@ -671,7 +678,7 @@ struct AddSheet: View {
     }
 
     private var confirmSub: some View {
-        Text("名前・もち日数・残量を調整できます。（あとでもOK）")
+        Text("名前・もち日数・残量を調整できます。")
             .font(AppFont.rounded(size: 12.5, weight: .semibold))
             .foregroundStyle(tokens.textSec)
             .frame(maxWidth: .infinity, alignment: .leading)
