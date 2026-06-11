@@ -80,8 +80,8 @@ struct ConfirmItemCard: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 14)
         .background(tokens.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        // 影 0 1 3 rgba(80,65,40,0.10)（出典: FKConfirmItem）。
-        .shadow(color: Color(.sRGB, red: 80 / 255, green: 65 / 255, blue: 40 / 255, opacity: 0.10),
+        // 影は出典（FKConfirmItem 0.10）より控えめに（ユーザー指定）。
+        .shadow(color: Color(.sRGB, red: 80 / 255, green: 65 / 255, blue: 40 / 255, opacity: 0.06),
                 radius: 1.5, x: 0, y: 1)
         .padding(.bottom, 10)
     }
@@ -153,7 +153,11 @@ struct ConfirmItemCard: View {
     // カレンダーボタン 34pt 角丸11。開時 accent 14% 地＋accent tint／閉時 中立背景＋textSec。
     private var calendarButton: some View {
         Button {
-            calendarOpen.toggle()
+            // withAnimation で包む（.animation(value:) 直付けだけだとコンテナ外の
+            // レイアウト移動が即時に飛び、ニョキっと育つ感じにならない。残量トグルと同じ流儀）。
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                calendarOpen.toggle()
+            }
         } label: {
             Image(systemName: "calendar")
                 .font(.system(size: 15, weight: .semibold))

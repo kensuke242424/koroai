@@ -322,14 +322,22 @@ struct AmountSection: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // add（確認画面）では説明テキストなし＝「残量」とトグルが水平に並ぶ。
+            // edit では従来どおり説明を添える。
             HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 0) {
+                if context == .add {
                     Text("残量")
                         .font(AppFont.rounded(size: 15.5, weight: .bold))
                         .foregroundStyle(tokens.text)
-                    Text(sub)
-                        .font(AppFont.rounded(size: 12.5, weight: .semibold))
-                        .foregroundStyle(tokens.textTer)
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("残量")
+                            .font(AppFont.rounded(size: 15.5, weight: .bold))
+                            .foregroundStyle(tokens.text)
+                        Text(sub)
+                            .font(AppFont.rounded(size: 12.5, weight: .semibold))
+                            .foregroundStyle(tokens.textTer)
+                    }
                 }
                 Spacer()
                 AmountModeToggle(mode: $mode)

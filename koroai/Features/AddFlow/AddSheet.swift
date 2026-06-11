@@ -89,6 +89,8 @@ struct AddSheet: View {
     @State private var selectScrollY: CGFloat = 0
     /// 確認画面のスクロール量（large 時の下スワイプ先勝ち判定用）。
     @State private var confirmScrollY: CGFloat = 0
+    /// インラインタイトルタップ→最上部スクロールの要求カウンタ（ScrollViewReader 側で監視）。
+    @State private var scrollToTopRequest = 0
 
     /// 折りたたみ中セクションの id 集合（"recent" ＋ FoodCategory.id）。
     /// 既定は「最近使った食材」だけ展開・他は全部折りたたみ。表示ごとにリセット（永続化しない）。
@@ -209,6 +211,20 @@ struct AddSheet: View {
         .overlay(alignment: .top) {
             selectInlineBar
         }
+        // インラインタイトルのタップで最上部へ戻る。視覚バーは allowsHitTesting(false) の
+        // ままなので、タイトル行の高さ分だけ透明なタップ受けを重ねる（ハンドル領域は塞がない）。
+        .overlay(alignment: .top) {
+            if inlineTitleProgress > 0.5 {
+                Color.clear
+                    .frame(height: 40)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !sheetDragging else { return }
+                        scrollToTopRequest += 1
+                    }
+                    .accessibilityLabel("最上部へ戻る")
+            }
+        }
         // 下部トレイ（チップ＋CTA）は1品以上選択されたときだけ、下からせり出す（ユーザー指定）。
         .overlay(alignment: .bottom) {
             if model.cartCount > 0 {
@@ -287,6 +303,7 @@ struct AddSheet: View {
 
                 VStack(spacing: 0) {
                     selectHeader
+                        .id("addSelectTop") // インラインタイトルタップ→最上部スクロールの戻り先
                     VStack(spacing: 0) {
                         // 特別セクション「最近使った食材」（空ならセクションごと非表示）。
                         if !recentPresets.isEmpty {
@@ -323,6 +340,12 @@ struct AddSheet: View {
                 }
             }
             .modifier(ScrollOffsetObserver(scrollY: $selectScrollY))
+            // インラインタイトルタップで最上部へ（タップ受けは selectScreen の overlay 側）。
+            .onChange(of: scrollToTopRequest) { _, _ in
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                    proxy.scrollTo("addSelectTop", anchor: .top)
+                }
+            }
             .frame(maxHeight: .infinity)
             #if DEBUG
             .onAppear {
@@ -466,7 +489,8 @@ struct AddSheet: View {
                 tileBadge(color: section.color, active: active)
                     .padding(7)
             }
-            .shadow(color: tokens.shadow, radius: 1.5, x: 0, y: 1)
+            // 影は控えめに（ユーザー指定で 55% に減衰）。
+            .shadow(color: tokens.shadow.opacity(0.55), radius: 1.5, x: 0, y: 1)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
