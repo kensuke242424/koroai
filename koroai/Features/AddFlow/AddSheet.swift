@@ -216,21 +216,38 @@ struct AddSheet: View {
     // ヘッダー（タイトル＋説明 ≈70pt）が隠れきるあたりでインラインタイトルを入れる。
     private var inlineTitleProgress: CGFloat { clamp01((selectScrollY - 56) / 22) }
 
+    /// インラインタイトル。ハンドル領域（高さ28・SheetContainer）まで背景を伸ばして
+    /// シート上端と一体の1枚のヘッダーに見せる（ハンドルは同位置に描き直す）。
+    /// allowsHitTesting(false) なので下の SheetContainer のハンドル操作はそのまま効く。
     private var selectInlineBar: some View {
-        Text("たべものを追加")
-            .font(AppFont.rounded(size: 16, weight: .heavy))
-            .foregroundStyle(tokens.text)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
-            .background {
-                tokens.bg2
-                    .overlay(alignment: .bottom) {
-                        Rectangle().fill(tokens.hair).frame(height: 1)
-                    }
-            }
-            .opacity(Double(inlineTitleProgress))
-            .allowsHitTesting(false)
+        VStack(spacing: 0) {
+            // SheetContainer.handleZone と同位置（カプセル上端 ≈15.5pt）に合わせる。
+            Capsule()
+                .fill(tokens.hair)
+                .frame(width: 40, height: 5)
+                .padding(.top, 15.5)
+            Text("たべものを追加")
+                .font(AppFont.rounded(size: 16, weight: .heavy))
+                .foregroundStyle(tokens.text)
+                .padding(.top, 9)
+                .padding(.bottom, 10)
+        }
+        .frame(maxWidth: .infinity)
+        .background {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 28, bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0, topTrailingRadius: 28,
+                style: .continuous
+            )
+            .fill(tokens.bg2)
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(tokens.hair).frame(height: 1)
+        }
+        // コンテンツ領域はハンドル領域の直下から始まるので、その分上に伸ばす。
+        .padding(.top, -28)
+        .opacity(Double(inlineTitleProgress))
+        .allowsHitTesting(false)
     }
 
     private var categoryGrid: some View {
