@@ -143,6 +143,16 @@ struct AddSheet: View {
             }
             model.screen = .confirm
         }
+        if args.contains("-openCloseConfirm") {
+            if let fish = FoodCategory.find("fish") {
+                model.addOne(category: fish, store: store)
+                model.addOne(category: fish, store: store)
+            }
+            if let dairy = FoodCategory.find("dairy") {
+                model.addOne(category: dairy, store: store)
+            }
+            model.confirmClose = true
+        }
     }
     #endif
 
@@ -605,17 +615,17 @@ struct AddSheet: View {
                     Text("かごに \(n)品 残っています")
                         .font(AppFont.rounded(size: 17, weight: .heavy))
                         .foregroundStyle(tokens.text)
-                    Text("登録するとホームに追加されます。どうしますか？")
+                    Text("このまま閉じると、選んだ内容はクリアされます。")
                         .font(AppFont.rounded(size: 13.5, weight: .semibold))
                         .foregroundStyle(tokens.textSec)
                         .lineSpacing(3)
                         .padding(.top, 4)
                     VStack(spacing: 9) {
                         Button {
-                            model.commit(context: context, toastCenter: toast)
+                            model.reset(store: store)
                             isPresented = false
                         } label: {
-                            Text("\(n)品を登録して閉じる")
+                            Text("かごを空にして閉じる")
                                 .font(AppFont.rounded(size: 15.5, weight: .heavy))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -624,11 +634,10 @@ struct AddSheet: View {
                         }
                         .buttonStyle(.plain)
                         Button {
-                            // かごを空にして閉じる
-                            model.reset(store: store)
-                            isPresented = false
+                            // 選ぶ画面にとどまる
+                            model.confirmClose = false
                         } label: {
-                            Text("かごを空にして閉じる")
+                            Text("キャンセル")
                                 .font(AppFont.rounded(size: 14.5, weight: .bold))
                                 .foregroundStyle(tokens.textSec)
                                 .frame(maxWidth: .infinity)
