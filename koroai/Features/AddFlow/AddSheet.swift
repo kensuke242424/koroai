@@ -273,6 +273,7 @@ struct AddSheet: View {
         return VStack(spacing: 0) {
             if !groups.isEmpty {
                 chipRow(groups)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             // 「確認する（N品）」CTA。
             Button {
@@ -298,6 +299,8 @@ struct AddSheet: View {
             .padding(.top, groups.isEmpty ? 12 : 0)
         }
         .padding(.bottom, 13)
+        // チップ行の出現/消滅（カゴ 0⇄1品）でトレイ高さが滑らかに変わるように。
+        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: groups.isEmpty)
         .background {
             // surface2 地・上角丸18・上 hairline・上向き淡影（0 -3 14 rgba(80,65,40,0.07)）。
             UnevenRoundedRectangle(
@@ -309,6 +312,15 @@ struct AddSheet: View {
             .ignoresSafeArea(edges: .bottom)
             .shadow(color: Color(.sRGB, red: 80 / 255, green: 65 / 255, blue: 40 / 255, opacity: 0.07),
                     radius: 7, x: 0, y: -3)
+            .background(alignment: .bottom) {
+                // 競り上がりバウンドのオーバーシュート中に下へ隙間が見えないよう、
+                // トレイ下端のさらに下へ surface2 を 120pt 余分に敷いておく（ブリード）。
+                Rectangle()
+                    .fill(tokens.surface2)
+                    .frame(height: 120)
+                    .offset(y: 120)
+                    .ignoresSafeArea(edges: .bottom)
+            }
         }
         .overlay(alignment: .top) {
             Rectangle().fill(tokens.hair).frame(height: 1)
