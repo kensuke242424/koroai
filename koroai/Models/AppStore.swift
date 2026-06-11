@@ -38,6 +38,8 @@ final class AppStore {
         static let showWeeklySummary = "settings.showWeeklySummary"
         static let amountModeOverrides = "settings.amountModeOverrides"
         static let presetCustomDefaults = "settings.presetCustomDefaults"
+        static let recentPresetIds = "settings.recentPresetIds"
+        static let confirmAmountShown = "settings.confirmAmountShown"
         static let notificationsEnabled = "settings.notificationsEnabled"
         static let digestHour = "settings.digestHour"
         static let digestMinute = "settings.digestMinute"
@@ -142,6 +144,18 @@ final class AppStore {
         }
     }
 
+    /// 最近 commit したプリセット id（新しいものが先頭・最大12件）。
+    /// 「選ぶ」画面先頭の「最近使った食材」セクションに使う。commit 時に rememberRecent で更新。
+    private(set) var recentPresetIds: [String] {
+        didSet { defaults.set(recentPresetIds, forKey: Keys.recentPresetIds) }
+    }
+
+    /// 確認画面で残量エリアを表示するか。既定 false（畳んだ状態）。
+    /// 確認画面ヘッダーの「残量」トグルで切替・永続化する（値自体は畳んでいても生きている）。
+    var confirmAmountShown: Bool {
+        didSet { defaults.set(confirmAmountShown, forKey: Keys.confirmAmountShown) }
+    }
+
     private let defaults: UserDefaults
 
     /// - Parameter defaults: 注入可能（テスト・プレビュー用）。既定は .standard。
@@ -156,6 +170,8 @@ final class AppStore {
         amountModeOverrides = (defaults.dictionary(forKey: Keys.amountModeOverrides) as? [String: String]) ?? [:]
         presetCustomDefaults = (defaults.data(forKey: Keys.presetCustomDefaults))
             .flatMap { try? JSONDecoder().decode([String: PresetCustomDefault].self, from: $0) } ?? [:]
+        recentPresetIds = (defaults.array(forKey: Keys.recentPresetIds) as? [String]) ?? []
+        confirmAmountShown = defaults.object(forKey: Keys.confirmAmountShown) as? Bool ?? false
         // 通知設定の既定: notificationsEnabled true / digest 8:00 / leadDays 1 / showMonthlyResult true
         notificationsEnabled = defaults.object(forKey: Keys.notificationsEnabled) as? Bool ?? true
         digestHour = defaults.object(forKey: Keys.digestHour) as? Int ?? 8
@@ -195,5 +211,18 @@ final class AppStore {
         } else {
             presetCustomDefaults.removeValue(forKey: presetId)
         }
+    }
+
+    // MARK: - 最近使った食材
+
+    /// 指定プリセット id を「最近使った食材」の先頭へ挿入する。
+    /// 既存の同 id は除去（重複なしで先頭へ移動）・最大12件にキャップ。空 id は無視。
+    func rememberRecent(_ presetId: String) {
+        guard !presetId.isEmpty else { return }
+        var list = recentPresetIds
+        list.removeAll { $0 == presetId }
+        list.insert(presetId, at: 0)
+        if list.count > 12 { list = Array(list.prefix(12)) }
+        recentPresetIds = list
     }
 }

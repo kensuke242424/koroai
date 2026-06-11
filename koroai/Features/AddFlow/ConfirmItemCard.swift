@@ -16,6 +16,7 @@ struct ConfirmItemCard: View {
     @Bindable var model: AddFlowModel
 
     @Environment(\.tokens) private var tokens
+    @Environment(AppStore.self) private var store
 
     /// カレンダーのインライン展開状態（カードローカル）。
     @State private var calendarOpen = false
@@ -69,16 +70,7 @@ struct ConfirmItemCard: View {
                 .padding(.bottom, 12)
             daysRow
             calendarSection
-            Color.clear.frame(height: 10)
-            AmountSection(
-                mode: modeBinding,
-                frac: amountBinding,
-                count: quantityBinding,
-                unit: item.unit,
-                context: .add,
-                total: item.quantity,
-                boxed: false
-            )
+            amountSection
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 14)
@@ -187,5 +179,30 @@ struct ConfirmItemCard: View {
         .frame(maxWidth: .infinity)
         .clipped()
         .animation(.spring(response: 0.32, dampingFraction: 0.86), value: calendarOpen)
+    }
+
+    // MARK: - 残量エリア（確認画面の「残量」トグルで開閉）
+
+    // カレンダー展開と同じ構造（常設コンテナ＋if＋.animation＋clipped）。
+    // off のとき AmountSection ごと畳む（上余白 10pt も一緒に消えるので下のバランスが崩れない）。
+    // 畳んでいても値（amount/quantity/mode）は生きている。
+    private var amountSection: some View {
+        VStack(spacing: 0) {
+            if store.confirmAmountShown {
+                Color.clear.frame(height: 10)
+                AmountSection(
+                    mode: modeBinding,
+                    frac: amountBinding,
+                    count: quantityBinding,
+                    unit: item.unit,
+                    context: .add,
+                    total: item.quantity,
+                    boxed: false
+                )
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .clipped()
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: store.confirmAmountShown)
     }
 }

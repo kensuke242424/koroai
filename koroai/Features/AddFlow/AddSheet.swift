@@ -83,6 +83,16 @@ struct AddSheet: View {
     @State private var didInitPresentation = false
     @State private var selectScrollY: CGFloat = 0
 
+    /// 折りたたみ中セクションの id 集合（"recent" ＋ FoodCategory.id）。
+    /// 既定は「最近使った食材」だけ展開・他は全部折りたたみ。表示ごとにリセット（永続化しない）。
+    @State private var collapsedSections: Set<String> = []
+    /// 「最近使った食材」セクションの表示スナップショット。
+    /// シート表示中に commit はされないので実質固定だが、表示開始時に1度確定する。
+    @State private var recentPresets: [IngredientPreset] = []
+
+    /// 「最近使った食材」の特別セクション id。
+    private static let recentSectionId = "recent"
+
     private func initPresentation() {
         guard !didInitPresentation else { return }
         didInitPresentation = true
@@ -90,9 +100,25 @@ struct AddSheet: View {
         detent = .medium
         chipRowShown = false
         selectScrollY = 0
+        // 最近使った食材（最大9枚・解決できない id はスキップ）。
+        recentPresets = Array(store.recentPresetIds.compactMap { IngredientCatalog.find($0) }.prefix(9))
+        // 既定の開閉: 「最近使った食材」のみ展開・他セクションは折りたたみ。
+        collapsedSections = Set(FoodCategory.all.map(\.id))
         #if DEBUG
         applyLaunchHook()
         #endif
+    }
+
+    private func isCollapsed(_ id: String) -> Bool { collapsedSections.contains(id) }
+
+    private func toggleSection(_ id: String) {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+            if collapsedSections.contains(id) {
+                collapsedSections.remove(id)
+            } else {
+                collapsedSections.insert(id)
+            }
+        }
     }
 
     #if DEBUG
@@ -246,9 +272,20 @@ struct AddSheet: View {
                 VStack(spacing: 0) {
                     selectHeader
                     VStack(spacing: 0) {
+                        // 特別セクション「最近使った食材」（空ならセクションごと非表示）。
+                        if !recentPresets.isEmpty {
+                            collapsibleSection(
+                                id: Self.recentSectionId,
+                                title: "最近使った食材",
+                                presets: recentPresets
+                            )
+                        }
                         ForEach(FoodCategory.all) { section in
-                            sectionHeader(section.name)
-                            tileGrid(IngredientCatalog.presets(in: section.id))
+                            collapsibleSection(
+                                id: section.id,
+                                title: section.name,
+                                presets: IngredientCatalog.presets(in: section.id)
+                            )
                         }
                     }
                     .padding(.horizontal, 18)
@@ -259,6 +296,8 @@ struct AddSheet: View {
                 .padding(.bottom, 132)
             }
             .coordinateSpace(name: "addSelectScroll")
+            // medium 中は内部スクロール不可（detent ドラッグと競合させない＝先勝ちで大化させる）。
+            .scrollDisabled(detent == .medium)
             .onPreferenceChange(ScrollOffsetKey.self) { y in
                 // iOS 17 用フォールバック。iOS 18+ は onScrollGeometryChange（下の modifier）で取得する。
                 if #unavailable(iOS 18.0) {
@@ -269,8 +308,10 @@ struct AddSheet: View {
             .frame(maxHeight: .infinity)
             #if DEBUG
             .onAppear {
-                // スクショ用: -scrollAddSelect でタイトル＋説明が隠れるまでスクロールした状態にする。
+                // スクショ用: -scrollAddSelect で全セクションを展開してから、
+                // タイトル＋説明が隠れるまでスクロールした状態にする（インラインタイトル検証用）。
                 guard CommandLine.arguments.contains("-scrollAddSelect") else { return }
+                collapsedSections = []
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     withAnimation { proxy.scrollTo("addSelectScrollTarget", anchor: .top) }
                 }
@@ -281,18 +322,63 @@ struct AddSheet: View {
 
     private func clamp01(_ x: CGFloat) -> CGFloat { min(max(x, 0), 1) }
 
-    private func sectionHeader(_ label: String) -> some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(AppFont.rounded(size: 12.5, weight: .heavy))
-                .foregroundStyle(tokens.brandInk)
-            Rectangle()
-                .fill(tokens.hair)
-                .frame(height: 1)
+    /// 折りたたみ可能なセクション（見出し行タップで開閉・展開時のみタイルグリッドを描く）。
+    /// presets に含まれる選択済み件数を見出し右のバッジに出す（折りたたみ中の手がかり）。
+    @ViewBuilder
+    private func collapsibleSection(id: String, title: String, presets: [IngredientPreset]) -> some View {
+        let collapsed = isCollapsed(id)
+        let selectedCount = presets.reduce(0) { $0 + (model.contains(presetId: $1.id) ? 1 : 0) }
+        VStack(spacing: 0) {
+            sectionHeader(title, collapsed: collapsed, selectedCount: selectedCount) {
+                toggleSection(id)
+            }
+            // 常設コンテナ＋if＋clipped＋.animation で高さアニメ（transition 不発の罠回避）。
+            VStack(spacing: 0) {
+                if !collapsed {
+                    tileGrid(presets)
+                        .padding(.bottom, 2)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .clipped()
         }
-        .padding(.horizontal, 2)
-        .padding(.top, 14)
-        .padding(.bottom, 9)
+    }
+
+    /// セクション見出し行。タップ領域は行全体・最低44pt。シェブロン（chevron.down を回転）。
+    /// 折りたたみ中で選択数 n>0 のとき、右側に小さい丸バッジで n を出す。
+    private func sectionHeader(
+        _ label: String,
+        collapsed: Bool,
+        selectedCount: Int,
+        onTap: @escaping () -> Void
+    ) -> some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Text(label)
+                    .font(AppFont.rounded(size: 12.5, weight: .heavy))
+                    .foregroundStyle(tokens.brandInk)
+                // 折りたたみ中・選択ありのときだけ件数バッジ。
+                if collapsed, selectedCount > 0 {
+                    Text("\(selectedCount)")
+                        .font(AppFont.rounded(size: 11, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .padding(.horizontal, 3)
+                        .background(tokens.accent, in: Circle())
+                }
+                Rectangle()
+                    .fill(tokens.hair)
+                    .frame(height: 1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(tokens.textTer)
+                    .rotationEffect(.degrees(collapsed ? -90 : 0))
+            }
+            .padding(.horizontal, 2)
+            .frame(minHeight: Layout.minTapTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func tileGrid(_ presets: [IngredientPreset]) -> some View {
@@ -306,9 +392,16 @@ struct AddSheet: View {
         }
     }
 
-    /// タイルタップでカゴに1件追加する。トレイの出現・チップ挿入・バッジ変化が
+    /// タイルタップでカゴにトグル選択する。トレイの出現・チップ挿入・バッジ変化が
     /// すべてアニメーションするよう、変異は必ず withAnimation で包む
     /// （.animation(value:) 直付けだけではトレイ高さの変化を取りこぼす）。
+    private func toggleAnimated(_ preset: IngredientPreset) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+            model.toggle(preset: preset, store: store)
+        }
+    }
+
+    /// DEBUG フック（-autoAddOne）用に 1件だけ追加するアニメーション付き経路。
     private func addOneAnimated(_ preset: IngredientPreset) {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
             model.addOne(preset: preset, store: store)
@@ -316,11 +409,11 @@ struct AddSheet: View {
     }
 
     /// タイル＝食材プリセット単位。アイコン・色はセクション（FoodCategory）を継承し、ラベルは preset.label。
+    /// タップ＝トグル選択（入っていれば外す）。同一 presetId はかご最大1件。
     private func presetTile(_ preset: IngredientPreset, section: FoodCategory) -> some View {
-        let count = model.countOf(presetId: preset.id)
-        let active = count > 0
+        let active = model.contains(presetId: preset.id)
         return Button {
-            addOneAnimated(preset)
+            toggleAnimated(preset)
         } label: {
             VStack(spacing: 9) {
                 CategoryIcon(category: section, size: 52)
@@ -347,7 +440,7 @@ struct AddSheet: View {
                     .strokeBorder(active ? section.color : .clear, lineWidth: 2)
             )
             .overlay(alignment: .topTrailing) {
-                tileBadge(color: section.color, count: count)
+                tileBadge(color: section.color, active: active)
                     .padding(7)
             }
             .shadow(color: tokens.shadow, radius: 1.5, x: 0, y: 1)
@@ -356,17 +449,17 @@ struct AddSheet: View {
         .buttonStyle(.plain)
     }
 
+    /// タイル右上バッジ。未選択＝「＋」・選択中＝チェックマーク（セクション色地・白）。
     @ViewBuilder
-    private func tileBadge(color: Color, count: Int) -> some View {
-        if count > 0 {
-            Text("\(count)")
-                .font(AppFont.rounded(size: 12.5, weight: .heavy))
+    private func tileBadge(color: Color, active: Bool) -> some View {
+        if active {
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .frame(minWidth: 21, minHeight: 21)
-                .background(color, in: Capsule())
-                // count 変化でポップ。
-                .id(count)
+                .frame(width: 21, height: 21)
+                .background(color, in: Circle())
+                // 選択状態の切替でポップ。
+                .id(active)
                 .transition(.scale.combined(with: .opacity))
         } else {
             Text("＋")
@@ -468,23 +561,15 @@ struct AddSheet: View {
     private func chip(_ g: AddFlowModel.CartGroup) -> some View {
         if let preset = IngredientCatalog.find(g.presetId),
            let section = FoodCategory.find(g.catId) {
+            // トグル選択化でカウントは廃止。「名前 ✕」だけのチップ（✕ でプリセット解除）。
             HStack(spacing: 5) {
-                // セクション色丸カウント 17pt 白字 fs10.5 w800（count 変化でポップ）。
-                Text("\(g.count)")
-                    .font(AppFont.rounded(size: 10.5, weight: .heavy))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 4)
-                    .frame(minWidth: 17, minHeight: 17)
-                    .background(section.color, in: Circle())
-                    .id(g.count)
-                    .transition(.scale.combined(with: .opacity))
                 Text(preset.label)
                     .font(AppFont.rounded(size: 12, weight: .heavy))
                     .foregroundStyle(tokens.text)
                     .fixedSize()
                 Button {
                     withAnimation(.spring(response: 0.36, dampingFraction: 0.7)) {
-                        model.removeLastOfPreset(g.presetId)
+                        model.removePreset(g.presetId)
                     }
                 } label: {
                     Image(systemName: "xmark")
@@ -495,9 +580,9 @@ struct AddSheet: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(preset.label) を1つ取り消し")
+                .accessibilityLabel("\(preset.label) を取り消し")
             }
-            .padding(.leading, 5)
+            .padding(.leading, 9)
             .padding(.trailing, 6)
             .padding(.vertical, 4)
             .background(tokens.surface, in: Capsule())
@@ -548,12 +633,41 @@ struct AddSheet: View {
                 .foregroundStyle(tokens.text)
             Spacer(minLength: 0)
 
-            // 右に同幅スペーサ（中央寄せ用）。
-            Color.clear.frame(width: 78, height: 1)
+            // 右スロット（左の「選び直す」と同幅78・中央寄せ維持）に「残量」トグル。
+            confirmAmountToggle
+                .frame(width: 78, alignment: .trailing)
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
         .padding(.bottom, 4)
+    }
+
+    /// 確認画面の「残量」表示トグル。on＝accent 14%地＋accent文字／off＝中立背景＋textSec
+    /// （カレンダーボタンの配色流儀を踏襲）。タップで store.confirmAmountShown を切替（永続化）。
+    private var confirmAmountToggle: some View {
+        let on = store.confirmAmountShown
+        return Button {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                store.confirmAmountShown.toggle()
+            }
+        } label: {
+            Text("残量")
+                .font(AppFont.rounded(size: 13, weight: .heavy))
+                .foregroundStyle(on ? tokens.accent : tokens.textSec)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 12)
+                .frame(minHeight: 34)
+                .background(
+                    on
+                        ? mixWithTransparent(tokens.accent, fractionOfFirst: 0.14)
+                        : ControlColors.neutral(isDark: tokens.colorSchemeIsDark, lightOpacity: 0.06),
+                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(on ? "残量の入力を隠す" : "残量を入力する")
     }
 
     private var confirmSub: some View {
@@ -597,6 +711,8 @@ struct AddSheet: View {
             // 下部トレイに隠れない余白。
             .padding(.bottom, 100)
         }
+        // medium 中は内部スクロール不可（detent ドラッグと競合させない）。
+        .scrollDisabled(detent == .medium)
         .frame(maxHeight: .infinity)
     }
 

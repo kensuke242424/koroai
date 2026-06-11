@@ -215,7 +215,7 @@ struct AddFlowModelTests {
         #expect(it.catId == "veg")
         #expect(it.presetId == "veg.tomato")
         #expect(it.days == tomato.days)            // 5
-        #expect(it.amount == 0.72)
+        #expect(it.amount == 1.0)                   // 既定は満タン
         #expect(it.quantity == 1)
         #expect(it.unit == tomato.unit)            // 個
         #expect(it.amountMode == tomato.mode)      // .count
@@ -254,6 +254,63 @@ struct AddFlowModelTests {
         #expect(model.countOf(presetId: "veg.cabbage") == 1)
         // セクション単位の取得口は2件。
         #expect(model.itemsInSection("veg").count == 2)
+    }
+
+    // MARK: toggle: タイルタップのトグル選択（同一 presetId はかご最大1件）
+
+    @Test func toggleAddsWhenAbsent() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        let sashimi = preset("fish.sashimi")
+        model.toggle(preset: sashimi, store: store)
+        #expect(model.contains(presetId: "fish.sashimi"))
+        #expect(model.countOf(presetId: "fish.sashimi") == 1)
+        #expect(model.cartCount == 1)
+    }
+
+    @Test func toggleRemovesWhenPresent() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        let sashimi = preset("fish.sashimi")
+        model.toggle(preset: sashimi, store: store) // 追加
+        model.toggle(preset: sashimi, store: store) // 再トグル → 削除
+        #expect(!model.contains(presetId: "fish.sashimi"))
+        #expect(model.countOf(presetId: "fish.sashimi") == 0)
+        #expect(model.cartCount == 0)
+    }
+
+    @Test func toggleCountIsZeroOrOne() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        let sashimi = preset("fish.sashimi")
+        model.toggle(preset: sashimi, store: store)
+        model.toggle(preset: sashimi, store: store) // もう一度入れてもトグルなので戻る
+        model.toggle(preset: sashimi, store: store) // 再度入る
+        #expect(model.countOf(presetId: "fish.sashimi") == 1) // 0/1 のみ
+    }
+
+    @Test func toggleDoesNotAffectOtherPresets() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.toggle(preset: preset("fish.sashimi"), store: store)
+        model.toggle(preset: preset("veg.tomato"), store: store)
+        // 刺身を外しても、トマトは残る。
+        model.toggle(preset: preset("fish.sashimi"), store: store)
+        #expect(!model.contains(presetId: "fish.sashimi"))
+        #expect(model.contains(presetId: "veg.tomato"))
+        #expect(model.countOf(presetId: "veg.tomato") == 1)
+        #expect(model.cartCount == 1)
+    }
+
+    @Test func removePresetClearsPreset() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(preset: preset("fish.sashimi"), store: store)
+        model.addOne(preset: preset("veg.tomato"), store: store)
+        model.removePreset("fish.sashimi")
+        #expect(model.countOf(presetId: "fish.sashimi") == 0)
+        #expect(model.countOf(presetId: "veg.tomato") == 1)
+        #expect(model.cartCount == 1)
     }
 
     // MARK: removeLastOfPreset: 最後に追加した方が消える
@@ -361,10 +418,10 @@ struct AddFlowModelTests {
     @Test func setSameValueDoesNotTouch() {
         let model = AddFlowModel()
         let store = makeStore()
-        let cabbage = preset("veg.cabbage") // 既定 .amount / amount 0.72
+        let cabbage = preset("veg.cabbage") // 既定 .amount / amount 1.0
         model.addOne(preset: cabbage, store: store)
         let id = model.cart.first!.id
-        model.setAmount(id: id, 0.72)
+        model.setAmount(id: id, 1.0)
         model.setAmountMode(id: id, .amount)
         model.setQuantity(id: id, 1)
         #expect(model.cart.first?.amountTouched == false)
@@ -531,7 +588,7 @@ struct PresetCustomDefaultTests {
         let cabbage = preset("veg.cabbage") // amount モード
         model.addOne(preset: cabbage, store: store)
         let id = model.cart.first!.id
-        model.setAmount(id: id, 0.4) // amount かつ touched かつ 0.72 と異なる
+        model.setAmount(id: id, 0.4) // amount かつ touched かつ 1.0 と異なる
         try commit(model)
 
         let custom = store.customDefault(for: "veg.cabbage")
@@ -561,7 +618,7 @@ struct PresetCustomDefaultTests {
     }
 
     @Test func commitUntouchedAmountSavesNothing() throws {
-        // amount を 0.72 のまま（touched しない）→ 保存しない。
+        // amount を 1.0 のまま（touched しない）→ 保存しない。
         let store = makeStore()
         let model = AddFlowModel()
         model.addOne(preset: preset("veg.cabbage"), store: store)
@@ -607,7 +664,7 @@ struct PresetCustomDefaultTests {
         #expect(it.amountTouched == false)
         // 残量系は preset 既定。
         #expect(it.amountMode == preset("veg.tomato").mode)
-        #expect(it.amount == 0.72)
+        #expect(it.amount == 1.0)
         #expect(it.quantity == 1)
     }
 
@@ -673,6 +730,21 @@ struct AppStorePersistenceTests {
         defaults.removePersistentDomain(forName: name)
     }
 
+    @Test func confirmAmountShownRoundTripThroughUserDefaults() {
+        let name = suite()
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        // 既定は false。
+        let fresh = AppStore(defaults: UserDefaults(suiteName: name)!)
+        #expect(fresh.confirmAmountShown == false)
+        // 書いて読み直す。
+        let writer = AppStore(defaults: UserDefaults(suiteName: name)!)
+        writer.confirmAmountShown = true
+        let reader = AppStore(defaults: UserDefaults(suiteName: name)!)
+        #expect(reader.confirmAmountShown == true)
+        defaults.removePersistentDomain(forName: name)
+    }
+
     @Test func setNilRemovesCustomDefault() {
         let name = suite()
         let defaults = UserDefaults(suiteName: name)!
@@ -687,6 +759,135 @@ struct AppStorePersistenceTests {
         store.setCustomDefault(PresetCustomDefault(), for: "veg.tomato")
         #expect(store.customDefault(for: "veg.tomato") == nil)
         defaults.removePersistentDomain(forName: name)
+    }
+}
+
+// MARK: - 最近使った食材（rememberRecent / commit で記憶）
+
+@MainActor
+struct RecentPresetTests {
+
+    private func cal() -> Calendar { TestSupport.tokyoCalendar() }
+    private func now() -> Date { TestSupport.fixedNow(cal()) }
+
+    private func makeStore(_ suite: String = "test.recent." + UUID().uuidString) -> AppStore {
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return AppStore(defaults: defaults)
+    }
+
+    private func preset(_ id: String) -> IngredientPreset { IngredientCatalog.find(id)! }
+
+    // MARK: rememberRecent（AppStore 直接）
+
+    @Test func rememberRecentInsertsAtFront() {
+        let store = makeStore()
+        store.rememberRecent("veg.tomato")
+        store.rememberRecent("fish.sashimi")
+        #expect(store.recentPresetIds == ["fish.sashimi", "veg.tomato"]) // 新しいものが先頭
+    }
+
+    @Test func rememberRecentDedupesAndMovesToFront() {
+        let store = makeStore()
+        store.rememberRecent("veg.tomato")
+        store.rememberRecent("fish.sashimi")
+        store.rememberRecent("veg.tomato") // 再登録 → 先頭へ移動・重複なし
+        #expect(store.recentPresetIds == ["veg.tomato", "fish.sashimi"])
+    }
+
+    @Test func rememberRecentCapsAtTwelve() {
+        let store = makeStore()
+        // 13件入れる → 最新12件だけ残る。
+        let ids = (0..<13).map { "id.\($0)" }
+        for id in ids { store.rememberRecent(id) }
+        #expect(store.recentPresetIds.count == 12)
+        // 最新（最後に入れた id.12）が先頭・最古（id.0）は押し出される。
+        #expect(store.recentPresetIds.first == "id.12")
+        #expect(!store.recentPresetIds.contains("id.0"))
+    }
+
+    @Test func rememberRecentIgnoresEmpty() {
+        let store = makeStore()
+        store.rememberRecent("")
+        #expect(store.recentPresetIds.isEmpty)
+    }
+
+    // MARK: commit で記憶される（追加順で最後のものが先頭）
+
+    @Test func commitRemembersRecentNewestFirst() throws {
+        let store = makeStore()
+        let model = AddFlowModel()
+        model.addOne(preset: preset("fish.sashimi"), store: store) // order 1
+        model.addOne(preset: preset("veg.tomato"), store: store)   // order 2（最後）
+        let context = try TestSupport.makeContext()
+        _ = model.commit(context: context, toastCenter: ToastCenter(), now: now(), calendar: cal())
+        // 追加順で最後に積んだ veg.tomato が先頭。
+        #expect(store.recentPresetIds == ["veg.tomato", "fish.sashimi"])
+    }
+
+    // MARK: 永続化ラウンドトリップ
+
+    @Test func recentPresetIdsRoundTripThroughUserDefaults() {
+        let name = "test.recent.persist." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let writer = AppStore(defaults: defaults)
+        writer.rememberRecent("veg.tomato")
+        writer.rememberRecent("fish.sashimi")
+        let reader = AppStore(defaults: UserDefaults(suiteName: name)!)
+        #expect(reader.recentPresetIds == ["fish.sashimi", "veg.tomato"])
+        defaults.removePersistentDomain(forName: name)
+    }
+}
+
+// MARK: - amount 既定 1.0（新規 DraftItem・カスタム既定値の記憶条件）
+
+@MainActor
+struct AmountDefaultTests {
+
+    private func cal() -> Calendar { TestSupport.tokyoCalendar() }
+    private func now() -> Date { TestSupport.fixedNow(cal()) }
+
+    private func makeStore(_ suite: String = "test.amountdef." + UUID().uuidString) -> AppStore {
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return AppStore(defaults: defaults)
+    }
+
+    private func preset(_ id: String) -> IngredientPreset { IngredientCatalog.find(id)! }
+
+    private func commit(_ model: AddFlowModel) throws {
+        let context = try TestSupport.makeContext()
+        _ = model.commit(context: context, toastCenter: ToastCenter(), now: now(), calendar: cal())
+    }
+
+    @Test func newDraftAmountDefaultsToFull() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(preset: preset("veg.cabbage"), store: store) // amount モード
+        #expect(model.cart.first?.amount == 1.0)
+    }
+
+    @Test func amountEqualToOneIsNotRemembered() throws {
+        // amount が 1.0 のまま（touched あっても 1.0 なら）→ 記憶しない。
+        let store = makeStore()
+        let model = AddFlowModel()
+        model.addOne(preset: preset("veg.cabbage"), store: store)
+        let id = model.cart.first!.id
+        model.setAmount(id: id, 1.0) // 既定と同値（setAmount は同値なら touch すらしない）
+        try commit(model)
+        #expect(store.customDefault(for: "veg.cabbage")?.amount == nil)
+    }
+
+    @Test func amountDifferentFromOneIsRemembered() throws {
+        // amount が 1.0 以外で touched → 記憶する。
+        let store = makeStore()
+        let model = AddFlowModel()
+        model.addOne(preset: preset("veg.cabbage"), store: store)
+        let id = model.cart.first!.id
+        model.setAmount(id: id, 0.5) // 1.0 と異なる・touched
+        try commit(model)
+        #expect(store.customDefault(for: "veg.cabbage")?.amount == 0.5)
     }
 }
 

@@ -52,9 +52,15 @@ final class AddFlowModel {
 
     var cartCount: Int { cart.count }
 
-    /// 指定プリセットのかご内件数（タイルのカウントバッジ用）。
+    /// 指定プリセットのかご内件数（タイルのバッジ判定用）。
+    /// トグル選択化により同一 presetId はかご最大1件なので、実質 0/1 を返す。
     func countOf(presetId: String) -> Int {
         cart.reduce(0) { $0 + ($1.presetId == presetId ? 1 : 0) }
+    }
+
+    /// 指定プリセットがかごに入っているか（タイルの選択状態）。
+    func contains(presetId: String) -> Bool {
+        cart.contains { $0.presetId == presetId }
     }
 
     /// プリセット別に集約したかご（最新追加が先頭＝追加順降順）。チップ・タイルバッジに使う。
@@ -92,13 +98,30 @@ final class AddFlowModel {
         orderCounter = 0
     }
 
-    /// タイルタップ＝カゴに 1件追加する（詳細には飛ばない）。
+    /// タイルタップ＝トグル選択。かごに入っていれば取り除き、いなければ 1件追加する
+    /// （同一 presetId はかご最大1件）。
+    func toggle(preset: IngredientPreset, store: AppStore) {
+        self.store = store
+        if contains(presetId: preset.id) {
+            removePreset(preset.id)
+        } else {
+            addOne(preset: preset, store: store)
+        }
+    }
+
+    /// 指定プリセットのかご内アイテムをすべて取り除く（チップの ✕・タイル再タップの解除）。
+    /// トグル選択化により実質 0/1 件を消すが、念のため全件削除する。
+    func removePreset(_ presetId: String) {
+        cart.removeAll { $0.presetId == presetId }
+    }
+
+    /// カゴに 1件追加する（詳細には飛ばない）。toggle の内部実装。
     /// 初期値の優先順位:
     ///  1. カスタム既定値（store.customDefault）があれば各フィールドへ適用。
     ///     mode/amount/quantity 由来を適用したら amountTouched=true（残量に手を入れた状態として扱う）。
     ///     name/days だけのカスタムなら amountTouched は false のまま。
     ///  2. mode は カスタム > store.amountModeOverride(for: sectionId) > preset.mode。
-    ///  3. それ以外は preset の値（amount 初期 0.72・quantity 1 は現行踏襲）。
+    ///  3. それ以外は preset の値（amount 初期 1.0＝満タン・quantity 1 は現行踏襲）。
     func addOne(preset: IngredientPreset, store: AppStore) {
         self.store = store
         orderCounter += 1
@@ -113,7 +136,7 @@ final class AddFlowModel {
 
         let name = custom?.name ?? ""
         let days = custom?.days ?? preset.days
-        let amount = custom?.amount ?? 0.72
+        let amount = custom?.amount ?? 1.0
         let quantity = custom?.quantity ?? 1
 
         // 残量系（mode/amount/quantity）にカスタムがあれば touched 扱い。name/days のみなら false。
@@ -210,8 +233,11 @@ final class AddFlowModel {
     @discardableResult
     func commit(context: ModelContext, toastCenter: ToastCenter, now: Date = .now, calendar: Calendar = .current) -> Int {
         let n = cart.count
-        for draft in cart {
+        // 「最近使った食材」の記憶。追加順昇順で rememberRecent（先頭挿入）すると、
+        // 最後に追加したプリセットが結果として先頭へ来る（新しいものが先頭）。
+        for draft in cart.sorted(by: { $0.addedOrder < $1.addedOrder }) {
             rememberCustomDefault(for: draft)
+            store?.rememberRecent(draft.presetId)
             context.insert(draft.makeFoodItem(now: now, calendar: calendar))
         }
         try? context.save()
@@ -228,7 +254,7 @@ final class AddFlowModel {
     ///  - name: trim 後、空でなく preset.name と異なる → 保存
     ///  - days: preset.days と異なる → 保存
     ///  - mode: preset.mode と異なる → 保存
-    ///  - amount: mode==.amount かつ touched かつ 0.72 と異なる → 保存
+    ///  - amount: mode==.amount かつ touched かつ 1.0 と異なる → 保存
     ///  - quantity: mode==.count かつ touched かつ 1 と異なる → 保存
     private func rememberCustomDefault(for draft: DraftItem) {
         // presetId 非空のみ対象（プリセット非由来の直接生成は記憶しない）。
@@ -240,7 +266,7 @@ final class AddFlowModel {
         if !trimmed.isEmpty, trimmed != preset.name { custom.name = trimmed }
         if draft.days != preset.days { custom.days = draft.days }
         if draft.amountMode != preset.mode { custom.amountMode = draft.amountMode.rawValue }
-        if draft.amountMode == .amount, draft.amountTouched, draft.amount != 0.72 {
+        if draft.amountMode == .amount, draft.amountTouched, draft.amount != 1.0 {
             custom.amount = draft.amount
         }
         if draft.amountMode == .count, draft.amountTouched, draft.quantity != 1 {

@@ -39,6 +39,10 @@ struct SheetContainer<Content: View>: View {
     /// detent ドラッグ中の高さ補正（上ドラッグで正）。
     @State private var dragDelta: CGFloat = 0
 
+    /// パネル全体ドラッグ（先勝ち）の係合状態。nil＝未判定、true＝縦ドラッグとして係合、false＝横優勢で見送り。
+    /// 1ジェスチャ内で1度だけ判定する（初動の縦横で確定）。
+    @State private var panelDragEngaged: Bool?
+
     // 出典: fk-ui.jsx FKSheet スクリム rgba(20,14,6,0.34)。
     private static var scrim: Color { Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.34) }
 
@@ -96,6 +100,12 @@ struct SheetContainer<Content: View>: View {
         )
         .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
                 radius: 20, x: 0, y: -8)
+        // 先勝ちの detent ドラッグ。detentFractions が無いシート（EditSheet 等）には
+        // GestureMask .none で完全に無効化する（onChanged 側でも detent nil をガード）。
+        .simultaneousGesture(
+            panelDetentGesture(geoHeight: geoHeight),
+            including: detentFractions != nil ? .gesture : .none
+        )
     }
 
     /// 現在のパネル高さ。detents 指定時は detent＋ドラッグ補正、そうでなければ heightFraction。
@@ -139,23 +149,65 @@ struct SheetContainer<Content: View>: View {
         DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { value in
                 guard detentFractions != nil else { return }
-                // 上ドラッグ（負の translation）で高さが増える。
-                dragDelta = -value.translation.height
+                applyDetentDrag(translationY: value.translation.height)
             }
             .onEnded { value in
-                guard let detents = detentFractions, let detent else {
-                    dragDelta = 0
-                    return
+                snapDetent(geoHeight: geoHeight, translationY: value.translation.height)
+            }
+    }
+
+    /// ドラッグ量→高さ補正。上ドラッグ（負の translation）で高さが増える。
+    private func applyDetentDrag(translationY: CGFloat) {
+        dragDelta = -translationY
+    }
+
+    /// 離した位置→近い detent へスナップ。dragDelta は 0 へ戻す。
+    private func snapDetent(geoHeight: CGFloat, translationY: CGFloat) {
+        guard let detents = detentFractions, let detent else {
+            dragDelta = 0
+            return
+        }
+        let current = detent.wrappedValue
+        let base = geoHeight * (current == .large ? detents.large : detents.medium)
+        let endHeight = base - translationY
+        let midpoint = geoHeight * (detents.medium + detents.large) / 2
+        let target: SheetDetent = endHeight >= midpoint ? .large : .medium
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+            detent.wrappedValue = target
+            dragDelta = 0
+        }
+    }
+
+    // MARK: - パネル全体の detent ドラッグ（先勝ち）
+
+    /// パネル全体（content 含む）に重ねる detent ドラッグ。
+    /// medium のとき、シート内のどこを上にスワイプしても先に detent を large にする。
+    /// - 発火条件: detentFractions あり・ドラッグ開始時の detent が .medium。
+    /// - 縦優勢判定（初動で |dy| > |dx| のときだけ係合）でチップ横スクロール／タップを壊さない。
+    /// - 座標は .global（ハンドルと同じ＝自己フィードバック発振防止）。
+    /// - 高さ計算・スナップは handleZone と同じ applyDetentDrag / snapDetent を再利用する。
+    private func panelDetentGesture(geoHeight: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 10, coordinateSpace: .global)
+            .onChanged { value in
+                guard detentFractions != nil, let detent else { return }
+                // 1ドラッグ内で最初の onChanged のときだけ係合判定する。
+                if panelDragEngaged == nil {
+                    // 開始時に medium でなければ最初から見送り（large はここでは扱わない）。
+                    guard detent.wrappedValue == .medium else {
+                        panelDragEngaged = false
+                        return
+                    }
+                    // 縦優勢のときだけ係合（横／斜めは見送り）。
+                    panelDragEngaged = abs(value.translation.height) > abs(value.translation.width)
                 }
-                let current = detent.wrappedValue
-                let base = geoHeight * (current == .large ? detents.large : detents.medium)
-                let endHeight = base - value.translation.height
-                let midpoint = geoHeight * (detents.medium + detents.large) / 2
-                let target: SheetDetent = endHeight >= midpoint ? .large : .medium
-                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
-                    detent.wrappedValue = target
-                    dragDelta = 0
-                }
+                guard panelDragEngaged == true else { return }
+                applyDetentDrag(translationY: value.translation.height)
+            }
+            .onEnded { value in
+                let engaged = panelDragEngaged == true
+                panelDragEngaged = nil
+                guard engaged else { return }
+                snapDetent(geoHeight: geoHeight, translationY: value.translation.height)
             }
     }
 
