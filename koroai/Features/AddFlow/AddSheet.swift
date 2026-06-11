@@ -658,20 +658,25 @@ struct AddSheet: View {
                 store.confirmAmountShown.toggle()
             }
         } label: {
-            Text("残量")
-                .font(AppFont.rounded(size: 13, weight: .heavy))
-                .foregroundStyle(on ? tokens.accent : tokens.textSec)
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, 12)
-                .frame(minHeight: 34)
-                .background(
-                    on
-                        ? mixWithTransparent(tokens.accent, fractionOfFirst: 0.14)
-                        : ControlColors.neutral(isDark: tokens.colorSchemeIsDark, lightOpacity: 0.06),
-                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                )
-                .contentShape(Rectangle())
+            // 「表示の切替」であることが伝わるよう目アイコンを添える（on=eye / off=eye.slash）。
+            HStack(spacing: 4) {
+                Image(systemName: on ? "eye" : "eye.slash")
+                    .font(.system(size: 11.5, weight: .bold))
+                Text("残量")
+                    .font(AppFont.rounded(size: 13, weight: .heavy))
+            }
+            .foregroundStyle(on ? tokens.accent : tokens.textSec)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 10)
+            .frame(minHeight: 34)
+            .background(
+                on
+                    ? mixWithTransparent(tokens.accent, fractionOfFirst: 0.14)
+                    : ControlColors.neutral(isDark: tokens.colorSchemeIsDark, lightOpacity: 0.06),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(on ? "残量の入力を隠す" : "残量を入力する")

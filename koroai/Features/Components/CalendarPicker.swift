@@ -109,6 +109,11 @@ struct CalendarPicker: View {
         }
     }
 
+    /// 日セルの固定高。aspectRatio(1) だと Text セルは内容高に縮む一方、
+    /// 空白セル（Color.clear）は正方形いっぱいに広がり、空白を含む週だけ
+    /// 行が高くなってしまうため、全セルを同じ高さに固定する。
+    private static let cellHeight: CGFloat = 34
+
     @ViewBuilder
     private func dayCell(_ date: Date?) -> some View {
         if let date {
@@ -123,7 +128,7 @@ struct CalendarPicker: View {
                     .font(AppFont.rounded(size: 13, weight: isSel || isToday ? .heavy : .semibold))
                     .foregroundStyle(isSel ? .white : (past ? tokens.textTer : tokens.text))
                     .frame(maxWidth: .infinity)
-                    .aspectRatio(1, contentMode: .fill)
+                    .frame(height: Self.cellHeight)
                     .background {
                         if isSel {
                             RoundedRectangle(cornerRadius: 10, style: .continuous).fill(tokens.accent)
@@ -138,7 +143,7 @@ struct CalendarPicker: View {
             .buttonStyle(.plain)
             .disabled(past)
         } else {
-            Color.clear.aspectRatio(1, contentMode: .fill)
+            Color.clear.frame(height: Self.cellHeight)
         }
     }
 

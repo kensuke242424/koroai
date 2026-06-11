@@ -19,7 +19,12 @@ struct ConfirmItemCard: View {
     @Environment(AppStore.self) private var store
 
     /// カレンダーのインライン展開状態（カードローカル）。
+    /// DEBUG: -openCardCalendar でカレンダー展開を初期表示する（スクショ検証用）。
+    #if DEBUG
+    @State private var calendarOpen = CommandLine.arguments.contains("-openCardCalendar")
+    #else
     @State private var calendarOpen = false
+    #endif
 
     private var category: FoodCategory? { FoodCategory.find(item.catId) }
     private var preset: IngredientPreset? { IngredientCatalog.find(item.presetId) }
