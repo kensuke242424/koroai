@@ -74,7 +74,8 @@ struct ConfirmItemCard: View {
                 count: quantityBinding,
                 unit: item.unit,
                 context: .add,
-                total: item.quantity
+                total: item.quantity,
+                boxed: false
             )
         }
         .padding(.vertical, 12)

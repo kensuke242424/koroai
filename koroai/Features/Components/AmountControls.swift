@@ -303,6 +303,10 @@ struct AmountSection: View {
     var context: AmountContext
     /// 初期個数（edit の差分ピップ用。add では count と同じ）。
     var total: Int
+    /// false でボックス（surface 背景＋内側余白）なし。カードと同色背景の中に
+    /// 置くとボックスが見えず、インデントだけが残ってラベル列が揃わないため、
+    /// ConfirmItemCard では false にして「もち日数」と左端を揃える。
+    var boxed: Bool = true
 
     @Environment(\.tokens) private var tokens
 
@@ -336,9 +340,14 @@ struct AmountSection: View {
                 AmountCount(count: $count, unit: unit, context: context, total: total)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 16)
-        .background(tokens.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, boxed ? 16 : 0)
+        .padding(.top, boxed ? 14 : 12)
+        .padding(.bottom, boxed ? 16 : 4)
+        .background {
+            if boxed {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(tokens.surface)
+            }
+        }
     }
 }
