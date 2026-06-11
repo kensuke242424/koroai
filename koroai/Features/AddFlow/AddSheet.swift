@@ -234,12 +234,14 @@ struct AddSheet: View {
         }
         .frame(maxWidth: .infinity)
         .background {
+            // 少しだけ透過させ、裏に回るタイルがほのかに見える馴染みを作る
+            // （確認画面の上部説明エリアと同じ印象に合わせる）。
             UnevenRoundedRectangle(
                 topLeadingRadius: 28, bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0, topTrailingRadius: 28,
                 style: .continuous
             )
-            .fill(tokens.bg2)
+            .fill(tokens.bg2.opacity(0.92))
         }
         .overlay(alignment: .bottom) {
             Rectangle().fill(tokens.hair).frame(height: 1)
