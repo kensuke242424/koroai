@@ -49,8 +49,10 @@ struct AddSheet: View {
     @Environment(\.modelContext) private var context
 
     @State private var model = AddFlowModel()
-    /// 下部トレイの遅延競り上がり用。シート本体より一拍遅れて「ひょこっ」と出す。
-    @State private var ctaBarVisible = false
+    /// シートの detent（中⇄大）。初期は中、確認画面へ進むと自動で大（参照HTML準拠）。
+    @State private var detent: SheetDetent = .medium
+    /// チップ行の段階出現用。CTA エリアのせり出し完了後に true にする（ユーザー指定の順序）。
+    @State private var chipRowShown = false
 
     private var copy: ToneCopy { store.tone.copy }
 
@@ -58,7 +60,8 @@ struct AddSheet: View {
         ZStack {
             SheetContainer(
                 isPresented: $isPresented,
-                heightFraction: 0.88,
+                detentFractions: (medium: 0.62, large: 0.88), // 中⇄大の2段 detent（参照HTML準拠）
+                detent: $detent,
                 extendContentUnderHomeIndicator: true, // 下部トレイを画面下端まで敷く（デザイン準拠）
                 onDismissRequest: { handleDismiss() }
             ) {
@@ -70,46 +73,59 @@ struct AddSheet: View {
         }
         .onChange(of: isPresented) { _, presented in
             if presented {
-                model.reset(store: store)
-                popInCtaBar()
-                #if DEBUG
-                applyLaunchHook()
-                #endif
+                initPresentation()
             } else {
-                ctaBarVisible = false
+                didInitPresentation = false
+                chipRowShown = false
             }
         }
-        #if DEBUG
+        .onChange(of: model.cartCount) { old, new in
+            if old == 0, new > 0 {
+                // CTA エリアのせり出し（トレイ挿入アニメ）が終わってからチップ行を出す（ユーザー指定の順序）。
+                chipRowShown = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+                        chipRowShown = true
+                    }
+                }
+            } else if new == 0 {
+                chipRowShown = false
+            }
+        }
+        .onChange(of: model.screen) { _, screen in
+            // 確認画面へ進むと自動で大 detent（参照HTML準拠）。
+            if screen == .confirm {
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                    detent = .large
+                }
+            }
+        }
         .onAppear {
-            if isPresented {
-                model.reset(store: store)
-                popInCtaBar()
-                applyLaunchHook()
-            }
+            if isPresented { initPresentation() }
         }
+    }
+
+    /// 表示開始時の初期化。onAppear と onChange の両方から呼ばれうるため
+    /// didInitPresentation で1回にガードする（reset の二重実行でカゴが消えるのを防ぐ）。
+    @State private var didInitPresentation = false
+
+    private func initPresentation() {
+        guard !didInitPresentation else { return }
+        didInitPresentation = true
+        model.reset(store: store)
+        detent = .medium
+        chipRowShown = false
+        #if DEBUG
+        applyLaunchHook()
         #endif
     }
 
-    /// 下部トレイをシート本体より一拍（0.22秒）遅らせて競り上げる（ユーザー指定の「ひょこっ」演出）。
-    private func popInCtaBar() {
-        ctaBarVisible = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
-                ctaBarVisible = true
-            }
-        }
-    }
-
     #if DEBUG
-    /// 起動フックの二重発火ガード（onAppear と onChange の両方から呼ばれうるため）。
-    @State private var launchHookApplied = false
-
     /// -openAddConfirm で fish×2・dairy×1 をカゴに積んで確認画面を初期表示する（スクショ用）。
     /// -autoAddOne <catId> は表示 1.2 秒後にタイルタップと同じ経路（addOneAnimated）で
     /// 1件追加する（トレイ出現アニメーションの録画検証用）。
+    /// 二重実行は initPresentation 側でガード済み。
     private func applyLaunchHook() {
-        guard !launchHookApplied else { return }
-        launchHookApplied = true
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "-autoAddOne"), i + 1 < args.count,
            let cat = FoodCategory.find(args[i + 1]) {
@@ -156,10 +172,12 @@ struct AddSheet: View {
             categoryGrid
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // 下部トレイ（チップ＋CTA）をオーバーレイで底に敷く。
+        // 下部トレイ（チップ＋CTA）は1品以上選択されたときだけ、下からせり出す（ユーザー指定）。
         .overlay(alignment: .bottom) {
-            selectTray
-                .offset(y: ctaBarVisible ? 0 : 160)
+            if model.cartCount > 0 {
+                selectTray
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
     }
 
@@ -292,8 +310,9 @@ struct AddSheet: View {
     private var selectTray: some View {
         let groups = model.grouped
         let n = model.cartCount
+        let showChips = chipRowShown && !groups.isEmpty
         return VStack(spacing: 0) {
-            if !groups.isEmpty {
+            if showChips {
                 chipRow(groups)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
@@ -318,11 +337,12 @@ struct AddSheet: View {
             .buttonStyle(.plain)
             .disabled(n == 0)
             .padding(.horizontal, 18)
-            .padding(.top, groups.isEmpty ? 12 : 0)
+            .padding(.top, showChips ? 0 : 12)
         }
-        .padding(.bottom, 13)
-        // チップ行の出現/消滅（カゴ 0⇄1品）でトレイ高さが滑らかに変わるように。
-        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: groups.isEmpty)
+        // 押しやすさのため、下部に適度な余白を確保する（ユーザー指定）。
+        .padding(.bottom, 26)
+        // チップ行の出現/消滅でトレイ高さが滑らかに変わるように。
+        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: showChips)
         .background {
             // surface2 地・上角丸18・上 hairline・上向き淡影（0 -3 14 rgba(80,65,40,0.07)）。
             UnevenRoundedRectangle(
@@ -426,7 +446,6 @@ struct AddSheet: View {
             confirmList
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(tokens.bg2)
         .overlay(alignment: .bottom) {
             confirmTray
         }
@@ -553,7 +572,8 @@ struct AddSheet: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 18)
         .padding(.top, 12)
-        .padding(.bottom, 13)
+        // 押しやすさのため、下部に適度な余白を確保する（ユーザー指定）。
+        .padding(.bottom, 26)
         .background {
             UnevenRoundedRectangle(
                 topLeadingRadius: 18, bottomLeadingRadius: 0,

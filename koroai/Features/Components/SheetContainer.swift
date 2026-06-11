@@ -3,19 +3,31 @@
 // 全画面 ZStack の最前面に重ねて使う前提（呼び出し側の ZStack 最上位に置く）。
 // - スクリム rgba(20,14,6,0.34)・タップで onDismissRequest（即閉じではない＝呼び出し側が閉じ判断）。
 // - パネルは bg2・上角丸28・上部に 40×5 のハンドル・下からスプリング（response≈0.34）で出入り。
-// - maxHeight は画面の 88%。height を指定すると固定高（追加シートは 84%）。
+// - maxHeight は画面の 88%。height を指定すると固定高（追加シートは detents を使用）。
+// - detents（中⇄大）対応: detents と detent Binding を渡すと、ハンドルのドラッグ/タップで
+//   高さを切り替えられる（参照: reference/ころあい 追加フロー 2ステップ.html の2段 detent）。
+//   ドラッグ途中はラバーバンド、離すと近い方へスナップ。タップでトグル。
 // - パネルは物理下端（ホームインジケータの下）まで届く。既定では中身の下に
 //   セーフエリア分のスペーサーを入れて操作要素を上げる。下部バーを画面下端まで
 //   敷きたいシート（追加シートのかごバー等）は extendContentUnderHomeIndicator: true を渡し、
 //   中身側で余白を管理する。
-// Step 5 の編集シートでも再利用するため、中身は @ViewBuilder で受ける汎用コンテナにする。
 
 import SwiftUI
+
+/// シートの detent（中⇄大）。
+enum SheetDetent {
+    case medium
+    case large
+}
 
 struct SheetContainer<Content: View>: View {
     @Binding var isPresented: Bool
     /// シート高さの画面比（0...1）。nil なら内容にフィット（maxHeight 88% まで）。
     var heightFraction: CGFloat?
+    /// 中⇄大の2段 detent（画面比）。指定時は heightFraction より優先。
+    var detentFractions: (medium: CGFloat, large: CGFloat)?
+    /// 現在の detent（detentFractions 指定時に使用。親が変更するときは withAnimation で）。
+    var detent: Binding<SheetDetent>?
     /// true なら中身を物理下端まで伸ばす（下部バーを敷くシート用）。既定 false。
     var extendContentUnderHomeIndicator: Bool = false
     /// スクリムタップ時の要求（即閉じではない）。nil なら isPresented を false にする既定動作。
@@ -23,6 +35,9 @@ struct SheetContainer<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     @Environment(\.tokens) private var tokens
+
+    /// detent ドラッグ中の高さ補正（上ドラッグで正）。
+    @State private var dragDelta: CGFloat = 0
 
     // 出典: fk-ui.jsx FKSheet スクリム rgba(20,14,6,0.34)。
     private static var scrim: Color { Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.34) }
@@ -41,12 +56,8 @@ struct SheetContainer<Content: View>: View {
                         .onTapGesture { requestDismiss() }
 
                     // パネル（下からスプリング・物理下端まで届く）
-                    panel(
-                        maxHeight: geo.size.height * 0.88,
-                        height: heightFraction.map { geo.size.height * $0 },
-                        bottomInset: bottomInset
-                    )
-                    .transition(.move(edge: .bottom))
+                    panel(geoHeight: geo.size.height, bottomInset: bottomInset)
+                        .transition(.move(edge: .bottom))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -56,14 +67,12 @@ struct SheetContainer<Content: View>: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
-    private func panel(maxHeight: CGFloat, height: CGFloat?, bottomInset: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            // ハンドル 40×5
-            Capsule()
-                .fill(tokens.hair)
-                .frame(width: 40, height: 5)
-                .padding(.top, 10)
-                .padding(.bottom, 2)
+    // MARK: - パネル
+
+    private func panel(geoHeight: CGFloat, bottomInset: CGFloat) -> some View {
+        let height = resolvedHeight(geoHeight: geoHeight)
+        return VStack(spacing: 0) {
+            handleZone(geoHeight: geoHeight)
 
             content()
 
@@ -74,7 +83,9 @@ struct SheetContainer<Content: View>: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: height, alignment: .top)
-        .frame(maxHeight: maxHeight, alignment: .top)
+        // detents 指定時は height が常に確定しているので cap は実質 no-op（ラバーバンドを潰さないよう height に合わせる）。
+        // 非 detent シートは従来どおり 88% 上限の内容フィット。
+        .frame(maxHeight: detentFractions != nil ? (height ?? geoHeight * 0.88) : geoHeight * 0.88, alignment: .top)
         .background(
             tokens.bg2,
             in: UnevenRoundedRectangle(
@@ -85,6 +96,65 @@ struct SheetContainer<Content: View>: View {
         )
         .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
                 radius: 20, x: 0, y: -8)
+    }
+
+    /// 現在のパネル高さ。detents 指定時は detent＋ドラッグ補正、そうでなければ heightFraction。
+    private func resolvedHeight(geoHeight: CGFloat) -> CGFloat? {
+        if let detents = detentFractions {
+            let current = detent?.wrappedValue ?? .medium
+            let base = geoHeight * (current == .large ? detents.large : detents.medium)
+            let minH = geoHeight * detents.medium
+            let maxH = geoHeight * detents.large
+            var h = base + dragDelta
+            // 範囲外はラバーバンド（0.35倍）。
+            if h > maxH { h = maxH + (h - maxH) * 0.35 }
+            if h < minH { h = minH - (minH - h) * 0.35 }
+            return h
+        }
+        return heightFraction.map { geoHeight * $0 }
+    }
+
+    /// ハンドル（detents 指定時はドラッグ/タップで中⇄大を切替）。
+    private func handleZone(geoHeight: CGFloat) -> some View {
+        Capsule()
+            .fill(tokens.hair)
+            .frame(width: 40, height: 5)
+            .padding(.top, 10)
+            .padding(.bottom, 2)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 28)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard detentFractions != nil, let detent else { return }
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                    detent.wrappedValue = (detent.wrappedValue == .large) ? .medium : .large
+                }
+            }
+            .gesture(detentDragGesture(geoHeight: geoHeight))
+    }
+
+    private func detentDragGesture(geoHeight: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 4)
+            .onChanged { value in
+                guard detentFractions != nil else { return }
+                // 上ドラッグ（負の translation）で高さが増える。
+                dragDelta = -value.translation.height
+            }
+            .onEnded { value in
+                guard let detents = detentFractions, let detent else {
+                    dragDelta = 0
+                    return
+                }
+                let current = detent.wrappedValue
+                let base = geoHeight * (current == .large ? detents.large : detents.medium)
+                let endHeight = base - value.translation.height
+                let midpoint = geoHeight * (detents.medium + detents.large) / 2
+                let target: SheetDetent = endHeight >= midpoint ? .large : .medium
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                    detent.wrappedValue = target
+                    dragDelta = 0
+                }
+            }
     }
 
     private func requestDismiss() {
