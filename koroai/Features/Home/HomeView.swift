@@ -153,7 +153,7 @@ struct HomeView: View {
     private func applyAddFlowLaunchHooks() {
         let args = CommandLine.arguments
         if args.contains("-openAddSheet") || args.contains("-openAddConfirm") || args.contains("-autoAddOne")
-            || args.contains("-openCloseConfirm") {
+            || args.contains("-openCloseConfirm") || args.contains("-scrollAddSelect") {
             addFlowPresented = true
         }
         if args.contains("-openEditFirst"), let first = items.first {
@@ -668,35 +668,6 @@ struct HomeView: View {
     }
 
     private func clamp01(_ x: CGFloat) -> CGFloat { min(max(x, 0), 1) }
-}
-
-// MARK: - スクロールオフセット PreferenceKey（iOS 17 互換）
-
-private struct ScrollOffsetKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
-// MARK: - スクロールオフセット監視（iOS 18+）
-
-/// iOS 18+ では onScrollGeometryChange でオフセットを取る（PreferenceKey 方式が
-/// 新しい OS で更新されないことがあるため）。iOS 17 は PreferenceKey フォールバック。
-private struct ScrollOffsetObserver: ViewModifier {
-    @Binding var scrollY: CGFloat
-
-    func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.onScrollGeometryChange(for: CGFloat.self) { geometry in
-                geometry.contentOffset.y + geometry.contentInsets.top
-            } action: { _, newValue in
-                if abs(scrollY - newValue) > 0.5 { scrollY = newValue }
-            }
-        } else {
-            content
-        }
-    }
 }
 
 // MARK: - 葉アイコン

@@ -108,6 +108,7 @@ struct AddSheet: View {
     /// 表示開始時の初期化。onAppear と onChange の両方から呼ばれうるため
     /// didInitPresentation で1回にガードする（reset の二重実行でカゴが消えるのを防ぐ）。
     @State private var didInitPresentation = false
+    @State private var selectScrollY: CGFloat = 0
 
     private func initPresentation() {
         guard !didInitPresentation else { return }
@@ -115,6 +116,7 @@ struct AddSheet: View {
         model.reset(store: store)
         detent = .medium
         chipRowShown = false
+        selectScrollY = 0
         #if DEBUG
         applyLaunchHook()
         #endif
@@ -178,10 +180,14 @@ struct AddSheet: View {
 
     private var selectScreen: some View {
         VStack(spacing: 0) {
-            selectHeader
             categoryGrid
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // タイトル＋説明が両方スクロールで隠れたら、インラインタイトルをフェードイン
+        // （確認画面のナビと同じ見た目。表示領域を最大化するため常設バーにしない）。
+        .overlay(alignment: .top) {
+            selectInlineBar
+        }
         // 下部トレイ（チップ＋CTA）は1品以上選択されたときだけ、下からせり出す（ユーザー指定）。
         .overlay(alignment: .bottom) {
             if model.cartCount > 0 {
@@ -191,6 +197,7 @@ struct AddSheet: View {
         }
     }
 
+    /// タイトル＋説明。スクロール内容に含めて、上にスクロールすると隠れる。
     private var selectHeader: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(copy.addTitle)
@@ -206,21 +213,75 @@ struct AddSheet: View {
         .padding(.bottom, 6)
     }
 
+    // ヘッダー（タイトル＋説明 ≈70pt）が隠れきるあたりでインラインタイトルを入れる。
+    private var inlineTitleProgress: CGFloat { clamp01((selectScrollY - 56) / 22) }
+
+    private var selectInlineBar: some View {
+        Text("たべものを追加")
+            .font(AppFont.rounded(size: 16, weight: .heavy))
+            .foregroundStyle(tokens.text)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+            .background {
+                tokens.bg2
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(tokens.hair).frame(height: 1)
+                    }
+            }
+            .opacity(Double(inlineTitleProgress))
+            .allowsHitTesting(false)
+    }
+
     private var categoryGrid: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(AddGroups.resolved) { g in
-                    sectionHeader(g.label)
-                    tileGrid(g.ids)
+        ScrollViewReader { proxy in
+            ScrollView {
+                // スクロール量をオフセットで取得（iOS 17 互換 PreferenceKey）
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: ScrollOffsetKey.self,
+                        value: -geo.frame(in: .named("addSelectScroll")).minY
+                    )
+                }
+                .frame(height: 0)
+
+                VStack(spacing: 0) {
+                    selectHeader
+                    VStack(spacing: 0) {
+                        ForEach(AddGroups.resolved) { g in
+                            sectionHeader(g.label)
+                            tileGrid(g.ids)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 2)
+                    .id("addSelectScrollTarget") // -scrollAddSelect 検証フックのスクロール先
+                }
+                // 下部トレイに隠れない余白（チップ行＋CTA 分）。
+                .padding(.bottom, 132)
+            }
+            .coordinateSpace(name: "addSelectScroll")
+            .onPreferenceChange(ScrollOffsetKey.self) { y in
+                // iOS 17 用フォールバック。iOS 18+ は onScrollGeometryChange（下の modifier）で取得する。
+                if #unavailable(iOS 18.0) {
+                    if abs(selectScrollY - y) > 1 { selectScrollY = y }
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 2)
-            // 下部トレイに隠れない余白（チップ行＋CTA 分）。
-            .padding(.bottom, 132)
+            .modifier(ScrollOffsetObserver(scrollY: $selectScrollY))
+            .frame(maxHeight: .infinity)
+            #if DEBUG
+            .onAppear {
+                // スクショ用: -scrollAddSelect でタイトル＋説明が隠れるまでスクロールした状態にする。
+                guard CommandLine.arguments.contains("-scrollAddSelect") else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    withAnimation { proxy.scrollTo("addSelectScrollTarget", anchor: .top) }
+                }
+            }
+            #endif
         }
-        .frame(maxHeight: .infinity)
     }
+
+    private func clamp01(_ x: CGFloat) -> CGFloat { min(max(x, 0), 1) }
 
     private func sectionHeader(_ label: String) -> some View {
         HStack(spacing: 8) {
