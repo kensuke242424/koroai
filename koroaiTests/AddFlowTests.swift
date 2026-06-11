@@ -1,4 +1,4 @@
-// 追加フロー（Step 4）のテスト。
+// 追加フロー（刷新版・2ステップ）のテスト。
 //
 // 純関数（CalendarGrid・DraftItem→FoodItem 変換）と AddFlowModel の状態遷移を検証する。
 // 日付系は固定 Calendar（Asia/Tokyo）/ 固定 Date（2026-06-10）で決定的にする。
@@ -104,7 +104,7 @@ struct DraftConversionTests {
     }
 }
 
-// MARK: - AddFlowModel（@MainActor）
+// MARK: - AddFlowModel（@MainActor・刷新版）
 
 @MainActor
 struct AddFlowModelTests {
@@ -119,83 +119,178 @@ struct AddFlowModelTests {
         return AppStore(defaults: defaults)
     }
 
-    @Test func openAddUsesCategoryDefaults() {
+    // MARK: addOne: 既定値・カウント増加
+
+    @Test func addOneUsesCategoryDefaults() {
         let model = AddFlowModel()
         let store = makeStore()
         let veg = FoodCategory.find("veg")!
-        model.openAdd(category: veg, store: store)
-        #expect(model.days == veg.defaultDays) // 5
-        #expect(model.quantity == 5)
-        #expect(model.amount == 1)
-        #expect(model.amountMode == veg.defaultAmountMode) // .amount
-        #expect(model.amountTouched == false)
-        #expect(model.view == .detail)
-        #expect(model.editingId == nil)
+        model.addOne(category: veg, store: store)
+        #expect(model.cartCount == 1)
+        let it = model.cart.first!
+        #expect(it.days == veg.defaultDays)            // 5
+        #expect(it.amount == 0.72)
+        #expect(it.quantity == 1)
+        #expect(it.unit == veg.defaultUnit)
+        #expect(it.amountMode == veg.defaultAmountMode) // .amount
+        #expect(it.amountTouched == false)
+        #expect(it.name == "")
+        #expect(model.countOf(catId: "veg") == 1)
+        #expect(model.screen == .select)
     }
 
-    @Test func modeOverrideIsSavedAndReflected() {
+    @Test func addOneReflectsModeOverride() {
+        let store = makeStore()
+        let veg = FoodCategory.find("veg")! // 既定 .amount
+        store.setAmountModeOverride(.count, for: "veg")
+        let model = AddFlowModel()
+        model.addOne(category: veg, store: store)
+        #expect(model.cart.first?.amountMode == .count) // override 反映
+    }
+
+    @Test func addOneIncrementsCount() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        let fish = FoodCategory.find("fish")!
+        model.addOne(category: fish, store: store)
+        model.addOne(category: fish, store: store)
+        #expect(model.countOf(catId: "fish") == 2)
+        #expect(model.cartCount == 2)
+    }
+
+    // MARK: removeLastOfCategory: 最後に追加した方が消える
+
+    @Test func removeLastOfCategoryRemovesNewest() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        let fish = FoodCategory.find("fish")!
+        model.addOne(category: fish, store: store) // order 1
+        model.addOne(category: fish, store: store) // order 2（最後）
+        let firstId = model.cart.first { $0.addedOrder == 1 }!.id
+        let lastId = model.cart.first { $0.addedOrder == 2 }!.id
+        model.removeLastOfCategory("fish")
+        #expect(model.countOf(catId: "fish") == 1)
+        // 最後に追加した方（order 2）が消える。
+        #expect(model.cart.contains { $0.id == firstId })
+        #expect(!model.cart.contains { $0.id == lastId })
+    }
+
+    @Test func removeLastOfCategoryToZero() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        let fish = FoodCategory.find("fish")!
+        model.addOne(category: fish, store: store)
+        model.removeLastOfCategory("fish") // 1件 → 0件（チップ消滅相当）
+        #expect(model.countOf(catId: "fish") == 0)
+        #expect(model.cartCount == 0)
+    }
+
+    @Test func removeLastOfCategoryNoopWhenAbsent() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(category: FoodCategory.find("fish")!, store: store)
+        model.removeLastOfCategory("veg") // 無いカテゴリ → 何も起きない
+        #expect(model.cartCount == 1)
+    }
+
+    // MARK: grouped: 追加順降順（最新が先頭）・count 集約が countOf と一致
+
+    @Test func groupedIsNewestFirstAndCountMatches() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(category: FoodCategory.find("fish")!, store: store)  // order 1
+        model.addOne(category: FoodCategory.find("veg")!, store: store)   // order 2
+        model.addOne(category: FoodCategory.find("fish")!, store: store)  // order 3（fish 最新）
+        let groups = model.grouped
+        // fish の最新 order(3) > veg の order(2) → fish が先頭。
+        #expect(groups.first?.catId == "fish")
+        #expect(groups.count == 2)
+        // count 集約がタイル countOf と一致。
+        for g in groups {
+            #expect(g.count == model.countOf(catId: g.catId))
+        }
+        #expect(groups.first { $0.catId == "fish" }?.count == 2)
+        #expect(groups.first { $0.catId == "veg" }?.count == 1)
+    }
+
+    // MARK: updateItem 系: amountTouched 遷移
+
+    @Test func setAmountModeTouchesAndSavesOverride() {
         let suite = "test.addflow.override." + UUID().uuidString
         let store = makeStore(suite)
         let veg = FoodCategory.find("veg")! // 既定 .amount
         let model = AddFlowModel()
-        model.openAdd(category: veg, store: store)
-        #expect(model.amountMode == .amount)
-        // ユーザーが count に切替 → override 保存・touched on
-        model.amountMode = .count
-        #expect(model.amountTouched == true)
-        #expect(store.amountModeOverride(for: "veg") == .count)
-        // 次に同カテゴリを開くと override が反映される
-        let model2 = AddFlowModel()
-        model2.openAdd(category: veg, store: store)
-        #expect(model2.amountMode == .count)
-        #expect(model2.amountTouched == false) // 初期化では touched しない
-    }
-
-    @Test func saveDetailAddsThenUpdates() {
-        let model = AddFlowModel()
-        let store = makeStore()
-        let veg = FoodCategory.find("veg")!
-        model.openAdd(category: veg, store: store)
-        model.name = "トマト"
-        model.saveDetail()
-        #expect(model.cartCount == 1)
-        #expect(model.view == .grid)
-        #expect(model.cart.first?.name == "トマト")
-
-        // 同じ行を編集して更新
+        model.addOne(category: veg, store: store)
         let id = model.cart.first!.id
-        model.openEdit(draftId: id, store: store)
-        #expect(model.editingId == id)
-        model.name = "ミニトマト"
-        model.days = 9
-        model.saveDetail()
-        #expect(model.cartCount == 1) // 増えない
-        #expect(model.cart.first?.name == "ミニトマト")
+        #expect(model.cart.first?.amountTouched == false)
+        model.setAmountMode(id: id, .count)
+        #expect(model.cart.first?.amountMode == .count)
+        #expect(model.cart.first?.amountTouched == true)
+        // mode 変更で override 記憶。
+        #expect(store.amountModeOverride(for: "veg") == .count)
+    }
+
+    @Test func setAmountTouches() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(category: FoodCategory.find("veg")!, store: store)
+        let id = model.cart.first!.id
+        model.setAmount(id: id, 0.5)
+        #expect(model.cart.first?.amount == 0.5)
+        #expect(model.cart.first?.amountTouched == true)
+    }
+
+    @Test func setQuantityTouches() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(category: FoodCategory.find("egg")!, store: store)
+        let id = model.cart.first!.id
+        model.setQuantity(id: id, 6)
+        #expect(model.cart.first?.quantity == 6)
+        #expect(model.cart.first?.amountTouched == true)
+    }
+
+    @Test func setNameAndDaysDoNotTouch() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(category: FoodCategory.find("veg")!, store: store)
+        let id = model.cart.first!.id
+        model.setName(id: id, "トマト")
+        model.setDays(id: id, 9)
+        #expect(model.cart.first?.name == "トマト")
         #expect(model.cart.first?.days == 9)
+        // name/days 変更では touched しない。
+        #expect(model.cart.first?.amountTouched == false)
     }
 
-    @Test func saveDetailEmptyNameUsesDefault() {
+    @Test func setSameValueDoesNotTouch() {
         let model = AddFlowModel()
         let store = makeStore()
-        model.openAdd(category: FoodCategory.find("fish")!, store: store)
-        model.name = "   "
-        model.saveDetail()
-        #expect(model.cart.first?.name == "刺身")
+        let veg = FoodCategory.find("veg")! // 既定 .amount / amount 0.72
+        model.addOne(category: veg, store: store)
+        let id = model.cart.first!.id
+        // 同値 set は touched しない。
+        model.setAmount(id: id, 0.72)
+        model.setAmountMode(id: id, .amount)
+        model.setQuantity(id: id, 1)
+        #expect(model.cart.first?.amountTouched == false)
     }
 
-    @Test func countOfReflectsCart() {
+    // MARK: removeItem: 個別除外
+
+    @Test func removeItemRemovesById() {
         let model = AddFlowModel()
         let store = makeStore()
-        model.openAdd(category: FoodCategory.find("fish")!, store: store)
-        model.saveDetail()
-        model.openAdd(category: FoodCategory.find("fish")!, store: store)
-        model.saveDetail()
-        model.openAdd(category: FoodCategory.find("veg")!, store: store)
-        model.saveDetail()
-        #expect(model.countOf(catId: "fish") == 2)
-        #expect(model.countOf(catId: "veg") == 1)
-        #expect(model.countOf(catId: "egg") == 0)
+        model.addOne(category: FoodCategory.find("fish")!, store: store)
+        model.addOne(category: FoodCategory.find("veg")!, store: store)
+        let vegId = model.cart.first { $0.catId == "veg" }!.id
+        model.removeItem(id: vegId)
+        #expect(model.cartCount == 1)
+        #expect(model.countOf(catId: "veg") == 0)
+        #expect(model.countOf(catId: "fish") == 1)
     }
+
+    // MARK: requestClose 分岐
 
     @Test func requestCloseBranchesOnCart() {
         let model = AddFlowModel()
@@ -204,41 +299,80 @@ struct AddFlowModelTests {
         #expect(model.requestClose() == true)
         #expect(model.confirmClose == false)
         // 1品入れると確認待ち
-        model.openAdd(category: FoodCategory.find("fish")!, store: store)
-        model.saveDetail()
+        model.addOne(category: FoodCategory.find("fish")!, store: store)
         #expect(model.requestClose() == false)
         #expect(model.confirmClose == true)
     }
 
-    @Test func deleteEditingRemovesFromCart() {
-        let model = AddFlowModel()
-        let store = makeStore()
-        model.openAdd(category: FoodCategory.find("fish")!, store: store)
-        model.saveDetail()
-        let id = model.cart.first!.id
-        model.openEdit(draftId: id, store: store)
-        model.deleteEditing()
-        #expect(model.cartCount == 0)
-        #expect(model.view == .grid)
-    }
+    // MARK: commit: 件数・name フォールバック・qtyTotal=max・amountIsSet=touched・reset
 
     @Test func commitInsertsFoodItemsAndResets() throws {
         let context = try TestSupport.makeContext()
         let toast = ToastCenter()
         let model = AddFlowModel()
         let store = makeStore()
-        model.openAdd(category: FoodCategory.find("fish")!, store: store)
-        model.name = "まぐろ"
-        model.saveDetail()
-        model.openAdd(category: FoodCategory.find("veg")!, store: store)
-        model.saveDetail()
+        model.addOne(category: FoodCategory.find("fish")!, store: store)
+        let fishId = model.cart.first!.id
+        model.setName(id: fishId, "まぐろ")
+        model.addOne(category: FoodCategory.find("veg")!, store: store)
+        model.screen = .confirm
         let n = model.commit(context: context, toastCenter: toast, now: now(), calendar: cal())
         #expect(n == 2)
         let items = try context.fetch(FetchDescriptor<FoodItem>())
         #expect(items.count == 2)
         #expect(items.contains { $0.name == "まぐろ" })
-        // commit 後はリセットされる
+        // 名前空はカテゴリ既定名へフォールバック（veg → トマト）。
+        #expect(items.contains { $0.name == "トマト" })
+        // commit 後はリセットされる。
         #expect(model.cartCount == 0)
+        #expect(model.screen == .select)
+    }
+
+    @Test func commitAmountIsSetFollowsTouched() throws {
+        let context = try TestSupport.makeContext()
+        let toast = ToastCenter()
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(category: FoodCategory.find("fish")!, store: store) // untouched
+        model.addOne(category: FoodCategory.find("veg")!, store: store)
+        let vegId = model.cart.first { $0.catId == "veg" }!.id
+        model.setAmount(id: vegId, 0.5) // touched
+        _ = model.commit(context: context, toastCenter: toast, now: now(), calendar: cal())
+        let items = try context.fetch(FetchDescriptor<FoodItem>())
+        let fishItem = items.first { $0.catId == "fish" }!
+        let vegItem = items.first { $0.catId == "veg" }!
+        #expect(fishItem.amountIsSet == false)
+        #expect(vegItem.amountIsSet == true)
+    }
+
+    @Test func commitQuantityTotalIsMax() throws {
+        let context = try TestSupport.makeContext()
+        let toast = ToastCenter()
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(category: FoodCategory.find("egg")!, store: store)
+        let id = model.cart.first!.id
+        model.setQuantity(id: id, 6) // quantity=6・追加時 total=quantity
+        _ = model.commit(context: context, toastCenter: toast, now: now(), calendar: cal())
+        let items = try context.fetch(FetchDescriptor<FoodItem>())
+        let egg = items.first { $0.catId == "egg" }!
+        // qtyTotal = max(qtyTotal, quantity) = 6。
+        #expect(egg.quantityTotal == 6)
+        #expect(egg.quantity == 6)
+    }
+
+    // MARK: reset
+
+    @Test func resetClearsCartAndScreen() {
+        let model = AddFlowModel()
+        let store = makeStore()
+        model.addOne(category: FoodCategory.find("fish")!, store: store)
+        model.screen = .confirm
+        model.confirmClose = true
+        model.reset(store: store)
+        #expect(model.cartCount == 0)
+        #expect(model.screen == .select)
+        #expect(model.confirmClose == false)
     }
 }
 

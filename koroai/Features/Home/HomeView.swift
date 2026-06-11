@@ -147,13 +147,12 @@ struct HomeView: View {
     }
 
     #if DEBUG
-    /// スクショ用 DEBUG フック。-openAddSheet で追加シートを初期表示、
-    /// -openAddDetail <catId> でそのカテゴリの詳細入力まで開く。
+    /// スクショ用 DEBUG フック。-openAddSheet で追加シート（選ぶ画面）を初期表示、
+    /// -openAddConfirm でカゴに積んだ確認画面を初期表示する（積む内容は AddSheet 側で処理）。
     /// -openEditFirst で先頭アイテムの編集シートを初期表示する。
     private func applyAddFlowLaunchHooks() {
         let args = CommandLine.arguments
-        if args.contains("-openAddSheet") || args.contains("-openAddDetail")
-            || args.contains("-openAddDetailDelayed") {
+        if args.contains("-openAddSheet") || args.contains("-openAddConfirm") {
             addFlowPresented = true
         }
         if args.contains("-openEditFirst"), let first = items.first {

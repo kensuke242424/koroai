@@ -52,7 +52,7 @@ struct ContentView: View {
             // ホーム前提のスクショ用フックは onboarded 済みにしてから出す。
             let homeBasedHooks = [
                 "-openReturn", "-openMonthResult", "-openEditFirst", "-openAddSheet",
-                "-openAddDetail", "-openAddDetailDelayed", "-openSettings", "-openReview",
+                "-openAddConfirm", "-openSettings", "-openReview",
                 "-openDigest", "-scrollHome",
             ]
             if homeBasedHooks.contains(where: args.contains) {

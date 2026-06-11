@@ -20,6 +20,8 @@ struct DraftItem: Identifiable, Equatable {
     var unit: String
     /// ユーザーが残量に触れたか（モード切替・スライダー・個数ボタンのいずれか）。
     var amountTouched: Bool
+    /// カゴに追加された順序（連番）。チップの「最新が左」・✕の「最後に追加された1件を取り除く」判定に使う。
+    var addedOrder: Int
 
     init(
         id: UUID = UUID(),
@@ -30,7 +32,8 @@ struct DraftItem: Identifiable, Equatable {
         amount: Double,
         quantity: Int,
         unit: String,
-        amountTouched: Bool = false
+        amountTouched: Bool = false,
+        addedOrder: Int = 0
     ) {
         self.id = id
         self.catId = catId
@@ -41,6 +44,7 @@ struct DraftItem: Identifiable, Equatable {
         self.quantity = quantity
         self.unit = unit
         self.amountTouched = amountTouched
+        self.addedOrder = addedOrder
     }
 
     /// この下書きから FoodItem を生成する（commit 用の純関数ロジック）。
