@@ -101,9 +101,22 @@ struct AddSheet: View {
     }
 
     #if DEBUG
+    /// 起動フックの二重発火ガード（onAppear と onChange の両方から呼ばれうるため）。
+    @State private var launchHookApplied = false
+
     /// -openAddConfirm で fish×2・dairy×1 をカゴに積んで確認画面を初期表示する（スクショ用）。
+    /// -autoAddOne <catId> は表示 1.2 秒後にタイルタップと同じ経路（addOneAnimated）で
+    /// 1件追加する（トレイ出現アニメーションの録画検証用）。
     private func applyLaunchHook() {
+        guard !launchHookApplied else { return }
+        launchHookApplied = true
         let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "-autoAddOne"), i + 1 < args.count,
+           let cat = FoodCategory.find(args[i + 1]) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                addOneAnimated(cat)
+            }
+        }
         if args.contains("-openAddConfirm") {
             if let fish = FoodCategory.find("fish") {
                 model.addOne(category: fish, store: store)
@@ -206,11 +219,20 @@ struct AddSheet: View {
         }
     }
 
+    /// タイルタップでカゴに1件追加する。トレイの出現・チップ挿入・バッジ変化が
+    /// すべてアニメーションするよう、変異は必ず withAnimation で包む
+    /// （.animation(value:) 直付けだけではトレイ高さの変化を取りこぼす）。
+    private func addOneAnimated(_ cat: FoodCategory) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+            model.addOne(category: cat, store: store)
+        }
+    }
+
     private func categoryTile(_ cat: FoodCategory) -> some View {
         let count = model.countOf(catId: cat.id)
         let active = count > 0
         return Button {
-            model.addOne(category: cat, store: store)
+            addOneAnimated(cat)
         } label: {
             VStack(spacing: 9) {
                 CategoryIcon(category: cat, size: 52)

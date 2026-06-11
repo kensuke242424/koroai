@@ -53,7 +53,7 @@ struct ContentView: View {
             let homeBasedHooks = [
                 "-openReturn", "-openMonthResult", "-openEditFirst", "-openAddSheet",
                 "-openAddConfirm", "-openSettings", "-openReview",
-                "-openDigest", "-scrollHome",
+                "-openDigest", "-scrollHome", "-autoAddOne",
             ]
             if homeBasedHooks.contains(where: args.contains) {
                 store.onboarded = true
