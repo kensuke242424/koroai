@@ -94,13 +94,6 @@ struct HomeView: View {
             // 今朝のまとめシート。
             DigestSheet(isPresented: $digestPresented)
 
-            // 設定（全画面オーバーレイ・最上位）。
-            if settingsPresented {
-                SettingsScreen(isPresented: $settingsPresented, onReplayGuide: replayGuide)
-                    .transition(.opacity)
-                    .zIndex(110)
-            }
-
             // 入れ直しシート（復帰画面より下・シートとして重ねる）。
             ReenterSheet(isPresented: $reenterPresented, onConfirmed: { resolveReturnFlow() })
                 .zIndex(115)
@@ -131,12 +124,15 @@ struct HomeView: View {
                     .zIndex(140)
             }
         }
-        // ふりかえりは NavigationStack の push 遷移（ユーザー指定）。ContentView 側で Stack を張る。
+        // ふりかえり・設定は NavigationStack の push 遷移（ユーザー指定）。ContentView 側で Stack を張る。
         .navigationDestination(isPresented: $reviewPresented) {
             ReviewScreen(isPresented: $reviewPresented)
         }
+        .navigationDestination(isPresented: $settingsPresented) {
+            SettingsScreen(isPresented: $settingsPresented, onReplayGuide: replayGuide)
+                .toolbar(.hidden, for: .navigationBar)
+        }
         .toolbar(.hidden, for: .navigationBar)
-        .animation(.easeInOut(duration: 0.28), value: settingsPresented)
         .animation(.easeInOut(duration: 0.3), value: returnPresented)
         .animation(.easeInOut(duration: 0.3), value: monthResult)
         .animation(.easeInOut(duration: 0.28), value: milestone)
@@ -321,11 +317,11 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // 設定ボタン（34pt 円・surface2・太陽風・タップ領域44）
+            // 設定ボタン（34pt 円・surface2・歯車・タップ領域44）
             Button {
                 openSettings()
             } label: {
-                Image(systemName: "sun.max")
+                Image(systemName: "gearshape")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(tokens.textSec)
                     .frame(width: 34, height: 34)
@@ -515,15 +511,12 @@ struct HomeView: View {
                 .foregroundStyle(tokens.brandInk)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(HomeCopy.renderPraise(praiseTemplate, count: monthlyAte))
-                            .font(AppFont.rounded(size: 15.5, weight: .heavy))
-                            .foregroundStyle(tokens.text)
-                            .lineLimit(2)
-                            .id(praiseTemplate) // 入替時にフェードイン
-                            .transition(.opacity)
-                        LeafBadge()
-                    }
+                    // 葉っぱは Text 連結で文末にインライン（別要素で右に置くと、
+                    // コメントの折り返し時に幅を奪ってバランスが崩れるため）。
+                    praiseTextWithLeaf
+                        .lineLimit(2)
+                        .id(praiseTemplate) // 入替時にフェードイン
+                        .transition(.opacity)
                     Text(HomeCopy.achievementSub)
                         .font(AppFont.rounded(size: 12.5, weight: .bold))
                         .foregroundStyle(tokens.textSec)
@@ -542,6 +535,17 @@ struct HomeView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// ほめコメント＋文末インラインの葉っぱ（テキストと一緒に折り返す）。
+    private var praiseTextWithLeaf: Text {
+        Text(HomeCopy.renderPraise(praiseTemplate, count: monthlyAte))
+            .font(AppFont.rounded(size: 15.5, weight: .heavy))
+            .foregroundStyle(tokens.text)
+        + Text(" ")
+        + Text(Image(systemName: "leaf.fill"))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(tokens.brand)
     }
 
     /// brandSoft → surface の 150° グラデ。
