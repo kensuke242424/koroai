@@ -60,7 +60,7 @@ struct AddSheet: View {
         ZStack {
             SheetContainer(
                 isPresented: $isPresented,
-                detentFractions: (medium: 0.62, large: 0.88), // 中⇄大の2段 detent（参照HTML準拠）
+                detentFractions: (medium: 0.68, large: 1.0), // 中68%⇄大は最大（セーフエリア上端）まで
                 detent: $detent,
                 extendContentUnderHomeIndicator: true, // 下部トレイを画面下端まで敷く（デザイン準拠）
                 onDismissRequest: { handleDismiss() }

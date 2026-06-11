@@ -106,8 +106,8 @@ struct SheetContainer<Content: View>: View {
             let minH = geoHeight * detents.medium
             let maxH = geoHeight * detents.large
             var h = base + dragDelta
-            // 範囲外はラバーバンド（0.35倍）。
-            if h > maxH { h = maxH + (h - maxH) * 0.35 }
+            // 範囲外はラバーバンド（下 0.35 / 上 0.15）。上はステータスバーに食い込まないよう geo 高さでハードクランプ。
+            if h > maxH { h = min(maxH + (h - maxH) * 0.15, geoHeight) }
             if h < minH { h = minH - (minH - h) * 0.35 }
             return h
         }
@@ -134,7 +134,9 @@ struct SheetContainer<Content: View>: View {
     }
 
     private func detentDragGesture(geoHeight: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 4)
+        // 注意: 座標系は必ず .global にする。ハンドル自身がパネルのリサイズで動くため、
+        // ローカル座標だと translation が自己フィードバックして高さが発振（ちらつき）する。
+        DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { value in
                 guard detentFractions != nil else { return }
                 // 上ドラッグ（負の translation）で高さが増える。
