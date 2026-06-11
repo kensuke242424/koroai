@@ -226,7 +226,7 @@ struct AddSheet: View {
                 .fill(tokens.hair)
                 .frame(width: 40, height: 5)
                 .padding(.top, 15.5)
-            Text("たべものを追加")
+            Text("食材をえらぶ")
                 .font(AppFont.rounded(size: 16, weight: .heavy))
                 .foregroundStyle(tokens.text)
                 .padding(.top, 9)
@@ -574,7 +574,7 @@ struct AddSheet: View {
     }
 
     private var confirmSub: some View {
-        Text("名前・もち日数・残量を確認して追加できます。")
+        Text("名前・もち日数・残量を調整できます。（あとでもOK）")
             .font(AppFont.rounded(size: 12.5, weight: .semibold))
             .foregroundStyle(tokens.textSec)
             .frame(maxWidth: .infinity, alignment: .leading)
