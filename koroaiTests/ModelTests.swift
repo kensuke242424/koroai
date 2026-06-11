@@ -39,8 +39,9 @@ enum TestSupport {
 
 struct FoodCategoryTests {
 
-    @Test func hasTwelveCategories() {
-        #expect(FoodCategory.all.count == 12)
+    @Test func hasTenSections() {
+        // 旧12カテゴリ → 10セクションに再編。
+        #expect(FoodCategory.all.count == 10)
     }
 
     @Test func idsAreUnique() {
@@ -75,8 +76,15 @@ struct FoodCategoryTests {
     }
 
     @Test func orderIsCanonical() {
-        let expected = ["fish", "chicken", "meat", "leafy", "veg", "mush", "fruit", "dairy", "tofu", "deli", "bread", "egg"]
+        let expected = ["meat", "fish", "veg", "mush", "fruit", "dairy", "egg", "tofu", "staple", "deli"]
         #expect(FoodCategory.all.map(\.id) == expected)
+    }
+
+    @Test func legacyAliasesResolveToSections() {
+        // 旧 id（chicken/leafy/bread）は保存データ互換のため新セクションへ解決される。
+        #expect(FoodCategory.find("chicken")?.id == "meat")
+        #expect(FoodCategory.find("leafy")?.id == "veg")
+        #expect(FoodCategory.find("bread")?.id == "staple")
     }
 }
 
@@ -89,12 +97,12 @@ struct FoodItemTests {
         let cal = TestSupport.tokyoCalendar()
         let now = TestSupport.fixedNow(cal)
         let context = try TestSupport.makeContext()
-        let cat = FoodCategory.find("chicken")!
+        let cat = FoodCategory.find("meat")!
         let item = FoodItem.make(category: cat, now: now, calendar: cal)
         context.insert(item)
 
-        #expect(item.name == cat.defaultName)             // "鶏むね肉"
-        #expect(item.catId == "chicken")
+        #expect(item.name == cat.defaultName)             // "豚こま"
+        #expect(item.catId == "meat")
         #expect(item.unit == cat.defaultUnit)             // "パック"
         #expect(item.amountMode == cat.defaultAmountMode) // .amount
         #expect(item.perishable == cat.perishable)        // true
@@ -166,8 +174,10 @@ struct SeedDataTests {
     }
 
     @Test func vegItemOverridesToCountMode() throws {
-        let veg = try seedItems().first { $0.catId == "veg" }
-        #expect(veg?.amountMode == .count)   // カテゴリ既定は amount だが count に上書き
+        // veg セクションには ほうれん草(amount) と ミニトマト(count) があるので名前で特定する。
+        let veg = try seedItems().first { $0.name == "ミニトマト" }
+        #expect(veg?.catId == "veg")
+        #expect(veg?.amountMode == .count)   // セクション既定は amount だが count に上書き
         #expect(veg?.quantity == 4)
         #expect(veg?.quantityTotal == 6)
     }

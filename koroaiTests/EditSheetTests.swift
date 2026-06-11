@@ -54,8 +54,8 @@ struct EditPatchTests {
         let patch = EditPatch(catId: "fish", name: "   ", days: 1, amountMode: .amount,
                               amount: 1, quantity: 1, unit: "切", amountTouched: false)
         patch.apply(to: item, now: now(), calendar: cal())
-        // FKEditSheet は cat.name へフォールバック（defaultName=刺身 ではなく name=魚・刺身）。
-        #expect(item.name == "魚・刺身")
+        // FKEditSheet は cat.name へフォールバック（defaultName=刺身 ではなく セクション name=魚介）。
+        #expect(item.name == "魚介")
         #expect(FoodCategory.find("fish")!.defaultName == "刺身") // 念のため別物であることを確認
     }
 

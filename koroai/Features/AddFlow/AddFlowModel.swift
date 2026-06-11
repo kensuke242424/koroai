@@ -20,13 +20,16 @@ final class AddFlowModel {
         case confirm
     }
 
-    /// 確認画面のカテゴリ別セクション（grouped 用）。
+    /// チップ・タイルバッジ用のプリセット別集約（grouped 用）。
     struct CartGroup: Identifiable {
+        /// 集約キー＝プリセット id（タイル単位）。
+        let presetId: String
+        /// このプリセットが属するセクション（FoodCategory）の id。チップ色・確認セクション分けに使う。
         let catId: String
         let items: [DraftItem]
-        /// このカテゴリ内の最新追加順（並べ替えキー）。
+        /// このプリセット内の最新追加順（並べ替えキー）。
         let lastOrder: Int
-        var id: String { catId }
+        var id: String { presetId }
         var count: Int { items.count }
     }
 
@@ -49,23 +52,33 @@ final class AddFlowModel {
 
     var cartCount: Int { cart.count }
 
-    /// 指定カテゴリのかご内件数（タイルのカウントバッジ用）。
-    func countOf(catId: String) -> Int {
-        cart.reduce(0) { $0 + ($1.catId == catId ? 1 : 0) }
+    /// 指定プリセットのかご内件数（タイルのカウントバッジ用）。
+    func countOf(presetId: String) -> Int {
+        cart.reduce(0) { $0 + ($1.presetId == presetId ? 1 : 0) }
     }
 
-    /// カテゴリ別に集約したかご（最新追加が先頭＝追加順降順）。チップ・確認カードに使う。
+    /// プリセット別に集約したかご（最新追加が先頭＝追加順降順）。チップ・タイルバッジに使う。
     var grouped: [CartGroup] {
         var map: [String: [DraftItem]] = [:]
         for it in cart {
-            map[it.catId, default: []].append(it)
+            map[it.presetId, default: []].append(it)
         }
-        return map.map { catId, items in
+        return map.map { presetId, items in
             let sorted = items.sorted { $0.addedOrder < $1.addedOrder }
-            return CartGroup(catId: catId, items: sorted, lastOrder: sorted.last?.addedOrder ?? 0)
+            return CartGroup(
+                presetId: presetId,
+                catId: sorted.first?.catId ?? "",
+                items: sorted,
+                lastOrder: sorted.last?.addedOrder ?? 0
+            )
         }
         // 最新の選択が先頭（追加順降順）。
         .sorted { $0.lastOrder > $1.lastOrder }
+    }
+
+    /// 指定セクション（catId）に属するかご内アイテム（追加順昇順）。確認画面のセクション分けに使う。
+    func itemsInSection(_ catId: String) -> [DraftItem] {
+        cart.filter { $0.catId == catId }.sorted { $0.addedOrder < $1.addedOrder }
     }
 
     // MARK: - フロー操作
@@ -80,32 +93,53 @@ final class AddFlowModel {
     }
 
     /// タイルタップ＝カゴに 1件追加する（詳細には飛ばない）。
-    /// 既定: days=カテゴリ既定 / name="" / amount=0.72 / quantity=1 / unit=カテゴリ既定 /
-    /// amountMode = override ?? カテゴリ既定（選んだモードを記憶） / amountTouched=false。
-    func addOne(category: FoodCategory, store: AppStore) {
+    /// 初期値の優先順位:
+    ///  1. カスタム既定値（store.customDefault）があれば各フィールドへ適用。
+    ///     mode/amount/quantity 由来を適用したら amountTouched=true（残量に手を入れた状態として扱う）。
+    ///     name/days だけのカスタムなら amountTouched は false のまま。
+    ///  2. mode は カスタム > store.amountModeOverride(for: sectionId) > preset.mode。
+    ///  3. それ以外は preset の値（amount 初期 0.72・quantity 1 は現行踏襲）。
+    func addOne(preset: IngredientPreset, store: AppStore) {
         self.store = store
         orderCounter += 1
-        let mode = store.amountModeOverride(for: category.id) ?? category.defaultAmountMode
+
+        let custom = store.customDefault(for: preset.id)
+
+        // mode: カスタム > セクションの override > preset 既定。
+        let customMode = custom?.amountMode.flatMap(AmountMode.init(rawValue:))
+        let mode = customMode
+            ?? store.amountModeOverride(for: preset.sectionId)
+            ?? preset.mode
+
+        let name = custom?.name ?? ""
+        let days = custom?.days ?? preset.days
+        let amount = custom?.amount ?? 0.72
+        let quantity = custom?.quantity ?? 1
+
+        // 残量系（mode/amount/quantity）にカスタムがあれば touched 扱い。name/days のみなら false。
+        let touched = customMode != nil || custom?.amount != nil || custom?.quantity != nil
+
         cart.append(
             DraftItem(
-                catId: category.id,
-                name: "",
-                days: category.defaultDays,
+                catId: preset.sectionId,
+                presetId: preset.id,
+                name: name,
+                days: days,
                 amountMode: mode,
-                amount: 0.72,
-                quantity: 1,
-                unit: category.defaultUnit,
-                amountTouched: false,
+                amount: amount,
+                quantity: quantity,
+                unit: preset.unit,
+                amountTouched: touched,
                 addedOrder: orderCounter
             )
         )
     }
 
-    /// 指定カテゴリの「最後に追加された 1件」をカゴから取り除く（チップの ✕）。
+    /// 指定プリセットの「最後に追加された 1件」をカゴから取り除く（チップの ✕）。
     /// カウント 2 以上なら −1（チップは残る）、1 なら 0 へ（チップ消滅）。
-    func removeLastOfCategory(_ catId: String) {
+    func removeLastOfPreset(_ presetId: String) {
         guard let target = cart
-            .filter({ $0.catId == catId })
+            .filter({ $0.presetId == presetId })
             .max(by: { $0.addedOrder < $1.addedOrder })
         else { return }
         cart.removeAll { $0.id == target.id }
@@ -177,6 +211,7 @@ final class AddFlowModel {
     func commit(context: ModelContext, toastCenter: ToastCenter, now: Date = .now, calendar: Calendar = .current) -> Int {
         let n = cart.count
         for draft in cart {
+            rememberCustomDefault(for: draft)
             context.insert(draft.makeFoodItem(now: now, calendar: calendar))
         }
         try? context.save()
@@ -185,5 +220,34 @@ final class AddFlowModel {
         }
         reset()
         return n
+    }
+
+    /// commit 時の記憶。プリセット既定と異なるフィールドだけをカスタム既定値として保存する。
+    /// 全フィールド一致なら既存カスタムを削除（既定へ戻したらリセット）。
+    /// 比較規則（仕様）:
+    ///  - name: trim 後、空でなく preset.name と異なる → 保存
+    ///  - days: preset.days と異なる → 保存
+    ///  - mode: preset.mode と異なる → 保存
+    ///  - amount: mode==.amount かつ touched かつ 0.72 と異なる → 保存
+    ///  - quantity: mode==.count かつ touched かつ 1 と異なる → 保存
+    private func rememberCustomDefault(for draft: DraftItem) {
+        // presetId 非空のみ対象（プリセット非由来の直接生成は記憶しない）。
+        guard !draft.presetId.isEmpty, let preset = IngredientCatalog.find(draft.presetId) else { return }
+
+        var custom = PresetCustomDefault()
+
+        let trimmed = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, trimmed != preset.name { custom.name = trimmed }
+        if draft.days != preset.days { custom.days = draft.days }
+        if draft.amountMode != preset.mode { custom.amountMode = draft.amountMode.rawValue }
+        if draft.amountMode == .amount, draft.amountTouched, draft.amount != 0.72 {
+            custom.amount = draft.amount
+        }
+        if draft.amountMode == .count, draft.amountTouched, draft.quantity != 1 {
+            custom.quantity = draft.quantity
+        }
+
+        // 空（＝全フィールド既定どおり）なら setCustomDefault(nil) 相当で既存カスタムを削除。
+        store?.setCustomDefault(custom.isEmpty ? nil : custom, for: draft.presetId)
     }
 }

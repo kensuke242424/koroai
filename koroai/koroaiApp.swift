@@ -82,8 +82,8 @@ struct koroaiApp: App {
     /// 日付は now から calendar で算出する（実時間に追随）。
     @MainActor
     static func seedAteLogs(now: Date = .now, calendar: Calendar = .current) -> [ConsumptionLog] {
-        let cats = ["fish", "leafy", "veg", "dairy", "tofu", "egg",
-                    "chicken", "meat", "fruit", "mush", "bread", "deli"]
+        let cats = ["meat", "fish", "veg", "mush", "fruit",
+                    "dairy", "egg", "tofu", "staple", "deli"]
         var logs: [ConsumptionLog] = []
         var catIndex = 0
         func nextCat() -> String { defer { catIndex += 1 }; return cats[catIndex % cats.count] }

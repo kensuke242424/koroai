@@ -24,8 +24,9 @@ enum PreviewData {
     /// ふりかえり用の ate ログ12件。今月6（うち前週2）・先月4・先々月2 に分散する。
     /// koroaiApp.seedAteLogs と同じ意図のプレビュー専用版（DEBUG ゲートの外で使えるよう独立実装）。
     @MainActor static func previewAteLogs(now: Date = .now, calendar: Calendar = .current) -> [ConsumptionLog] {
-        let cats = ["fish", "leafy", "veg", "dairy", "tofu", "egg",
-                    "chicken", "meat", "fruit", "mush", "bread", "deli"]
+        // 新10セクション（FoodCategory）id。集計はセクション単位なので分布だけ変わり件数は不変。
+        let cats = ["meat", "fish", "veg", "mush", "fruit",
+                    "dairy", "egg", "tofu", "staple", "deli"]
         var logs: [ConsumptionLog] = []
         var i = 0
         func cat() -> String { defer { i += 1 }; return cats[i % cats.count] }

@@ -9,6 +9,9 @@ import Foundation
 struct DraftItem: Identifiable, Equatable {
     let id: UUID
     var catId: String
+    /// 由来した食材プリセットの id（IngredientCatalog）。タイル経由で追加すると入る。
+    /// 空文字 "" のときはプリセット非由来（後方互換・直接生成）で、名前は catId のセクション既定へフォールバックする。
+    var presetId: String
     var name: String
     /// もち日数（today からの相対）。expiresAt は commit 時に DateMath で絶対日付へ変換。
     var days: Int
@@ -26,6 +29,7 @@ struct DraftItem: Identifiable, Equatable {
     init(
         id: UUID = UUID(),
         catId: String,
+        presetId: String = "",
         name: String,
         days: Int,
         amountMode: AmountMode,
@@ -37,6 +41,7 @@ struct DraftItem: Identifiable, Equatable {
     ) {
         self.id = id
         self.catId = catId
+        self.presetId = presetId
         self.name = name
         self.days = days
         self.amountMode = amountMode
@@ -48,15 +53,17 @@ struct DraftItem: Identifiable, Equatable {
     }
 
     /// この下書きから FoodItem を生成する（commit 用の純関数ロジック）。
-    /// - name 空 → カテゴリ既定名へフォールバック。
+    /// - name 空 → プリセット既定名 → セクション既定名 の順でフォールバック。
     /// - days → DateMath.expiryDate で絶対 expiresAt へ変換。
-    /// - perishable はカテゴリからコピー。
+    /// - perishable はカテゴリ（セクション）からコピー。
     /// - quantityTotal = quantity（追加時は初期個数 = 現在個数）。
     /// - amountIsSet = amountTouched。
     func makeFoodItem(now: Date = .now, calendar: Calendar = .current) -> FoodItem {
         let category = FoodCategory.find(catId)
+        let preset = IngredientCatalog.find(presetId)
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedName = trimmed.isEmpty ? (category?.defaultName ?? category?.name ?? "") : trimmed
+        let fallback = preset?.name ?? category?.defaultName ?? category?.name ?? ""
+        let resolvedName = trimmed.isEmpty ? fallback : trimmed
         return FoodItem(
             catId: catId,
             name: resolvedName,

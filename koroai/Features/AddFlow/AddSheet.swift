@@ -4,38 +4,11 @@
 // 幅 2倍の HStack トラックを offset x で 0 ⇄ −画面幅 にずらして「選ぶ」⇄「確認・編集」を横プッシュする。
 // 閉じる確認は全画面に重ねるトップモーダル。文言はプロトタイプ / ADD_FLOW.md から一字一句転記。
 //
-// セクション分け（確定仕様）は AddGroups。グループ外カテゴリは自動で「その他」。
+// セクション＝FoodCategory.all（10件）、タイル＝IngredientPreset（計76枚）。
+// セクション見出しはセクション name、タイルは preset.label を表示する。
 
 import SwiftUI
 import SwiftData
-
-// MARK: - 追加フローのカテゴリセクション
-
-/// 追加フローのカテゴリセクション。出典: fk-flows.jsx FK_ADD_GROUPS。
-struct AddGroup: Identifiable {
-    let key: String
-    let label: String
-    let ids: [String]
-    var id: String { key }
-}
-
-enum AddGroups {
-    static let base: [AddGroup] = [
-        AddGroup(key: "meat", label: "肉・魚介", ids: ["fish", "chicken", "meat"]),
-        AddGroup(key: "veg", label: "野菜・きのこ", ids: ["leafy", "veg", "mush"]),
-        AddGroup(key: "fruit", label: "果物・乳製品", ids: ["fruit", "dairy"]),
-        AddGroup(key: "soy", label: "大豆製品・卵", ids: ["tofu", "egg"]),
-        AddGroup(key: "staple", label: "主食・惣菜", ids: ["bread", "deli"]),
-    ]
-
-    /// 全カテゴリのうちグループ外があれば「その他」を末尾に補う。
-    static var resolved: [AddGroup] {
-        let grouped = Set(base.flatMap(\.ids))
-        let extras = FoodCategory.all.map(\.id).filter { !grouped.contains($0) }
-        if extras.isEmpty { return base }
-        return base + [AddGroup(key: "other", label: "その他", ids: extras)]
-    }
-}
 
 // MARK: - AddSheet
 
@@ -123,38 +96,44 @@ struct AddSheet: View {
     }
 
     #if DEBUG
-    /// -openAddConfirm で fish×2・dairy×1 をカゴに積んで確認画面を初期表示する（スクショ用）。
-    /// -autoAddOne <catId> は表示 1.2 秒後にタイルタップと同じ経路（addOneAnimated）で
-    /// 1件追加する（トレイ出現アニメーションの録画検証用）。
+    /// -openAddConfirm で 刺身×2・牛乳×1 をカゴに積んで確認画面を初期表示する（スクショ用）。
+    /// -autoAddOne <id> は表示 1.2 秒後にタイルタップと同じ経路（addOneAnimated）で 1件追加する
+    /// （トレイ出現アニメーションの録画検証用）。<id> は preset id 優先・後方互換で section id も試す。
     /// 二重実行は initPresentation 側でガード済み。
     private func applyLaunchHook() {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "-autoAddOne"), i + 1 < args.count,
-           let cat = FoodCategory.find(args[i + 1]) {
+           let preset = resolvePreset(args[i + 1]) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                addOneAnimated(cat)
+                addOneAnimated(preset)
             }
         }
         if args.contains("-openAddConfirm") {
-            if let fish = FoodCategory.find("fish") {
-                model.addOne(category: fish, store: store)
-                model.addOne(category: fish, store: store)
-            }
-            if let dairy = FoodCategory.find("dairy") {
-                model.addOne(category: dairy, store: store)
-            }
+            seedConfirmSample()
             model.screen = .confirm
         }
         if args.contains("-openCloseConfirm") {
-            if let fish = FoodCategory.find("fish") {
-                model.addOne(category: fish, store: store)
-                model.addOne(category: fish, store: store)
-            }
-            if let dairy = FoodCategory.find("dairy") {
-                model.addOne(category: dairy, store: store)
-            }
+            seedConfirmSample()
             model.confirmClose = true
         }
+    }
+
+    /// スクショ用に 刺身×2・牛乳×1 を積む。
+    private func seedConfirmSample() {
+        if let sashimi = IngredientCatalog.find("fish.sashimi") {
+            model.addOne(preset: sashimi, store: store)
+            model.addOne(preset: sashimi, store: store)
+        }
+        if let milk = IngredientCatalog.find("dairy.milk") {
+            model.addOne(preset: milk, store: store)
+        }
+    }
+
+    /// -autoAddOne の引数解決。preset id を優先し、無ければ section id（FoodCategory）の先頭プリセットにフォールバック。
+    private func resolvePreset(_ id: String) -> IngredientPreset? {
+        if let p = IngredientCatalog.find(id) { return p }
+        if let cat = FoodCategory.find(id) { return IngredientCatalog.presets(in: cat.id).first }
+        return nil
     }
     #endif
 
@@ -267,9 +246,9 @@ struct AddSheet: View {
                 VStack(spacing: 0) {
                     selectHeader
                     VStack(spacing: 0) {
-                        ForEach(AddGroups.resolved) { g in
-                            sectionHeader(g.label)
-                            tileGrid(g.ids)
+                        ForEach(FoodCategory.all) { section in
+                            sectionHeader(section.name)
+                            tileGrid(IngredientCatalog.presets(in: section.id))
                         }
                     }
                     .padding(.horizontal, 18)
@@ -316,12 +295,12 @@ struct AddSheet: View {
         .padding(.bottom, 9)
     }
 
-    private func tileGrid(_ ids: [String]) -> some View {
+    private func tileGrid(_ presets: [IngredientPreset]) -> some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 11), count: 3)
         return LazyVGrid(columns: columns, spacing: 11) {
-            ForEach(ids, id: \.self) { id in
-                if let cat = FoodCategory.find(id) {
-                    categoryTile(cat)
+            ForEach(presets) { preset in
+                if let section = FoodCategory.find(preset.sectionId) {
+                    presetTile(preset, section: section)
                 }
             }
         }
@@ -330,25 +309,28 @@ struct AddSheet: View {
     /// タイルタップでカゴに1件追加する。トレイの出現・チップ挿入・バッジ変化が
     /// すべてアニメーションするよう、変異は必ず withAnimation で包む
     /// （.animation(value:) 直付けだけではトレイ高さの変化を取りこぼす）。
-    private func addOneAnimated(_ cat: FoodCategory) {
+    private func addOneAnimated(_ preset: IngredientPreset) {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
-            model.addOne(category: cat, store: store)
+            model.addOne(preset: preset, store: store)
         }
     }
 
-    private func categoryTile(_ cat: FoodCategory) -> some View {
-        let count = model.countOf(catId: cat.id)
+    /// タイル＝食材プリセット単位。アイコン・色はセクション（FoodCategory）を継承し、ラベルは preset.label。
+    private func presetTile(_ preset: IngredientPreset, section: FoodCategory) -> some View {
+        let count = model.countOf(presetId: preset.id)
         let active = count > 0
         return Button {
-            addOneAnimated(cat)
+            addOneAnimated(preset)
         } label: {
             VStack(spacing: 9) {
-                CategoryIcon(category: cat, size: 52)
-                Text(cat.name)
+                CategoryIcon(category: section, size: 52)
+                Text(preset.label)
                     .font(AppFont.rounded(size: 14, weight: .bold))
                     .foregroundStyle(tokens.text)
                     .multilineTextAlignment(.center)
+                    // 長い名前（ほうれん草・小松菜 等）は1行に縮めて収める。
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 16)
@@ -356,16 +338,16 @@ struct AddSheet: View {
             .padding(.bottom, 13)
             .background(
                 active
-                    ? mixOKLab(cat.color, tokens.surface, fractionOfFirst: 0.14)
+                    ? mixOKLab(section.color, tokens.surface, fractionOfFirst: 0.14)
                     : tokens.surface,
                 in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(active ? cat.color : .clear, lineWidth: 2)
+                    .strokeBorder(active ? section.color : .clear, lineWidth: 2)
             )
             .overlay(alignment: .topTrailing) {
-                tileBadge(cat: cat, count: count)
+                tileBadge(color: section.color, count: count)
                     .padding(7)
             }
             .shadow(color: tokens.shadow, radius: 1.5, x: 0, y: 1)
@@ -375,14 +357,14 @@ struct AddSheet: View {
     }
 
     @ViewBuilder
-    private func tileBadge(cat: FoodCategory, count: Int) -> some View {
+    private func tileBadge(color: Color, count: Int) -> some View {
         if count > 0 {
             Text("\(count)")
                 .font(AppFont.rounded(size: 12.5, weight: .heavy))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)
                 .frame(minWidth: 21, minHeight: 21)
-                .background(cat.color, in: Capsule())
+                .background(color, in: Capsule())
                 // count 変化でポップ。
                 .id(count)
                 .transition(.scale.combined(with: .opacity))
@@ -484,24 +466,25 @@ struct AddSheet: View {
 
     @ViewBuilder
     private func chip(_ g: AddFlowModel.CartGroup) -> some View {
-        if let cat = FoodCategory.find(g.catId) {
+        if let preset = IngredientCatalog.find(g.presetId),
+           let section = FoodCategory.find(g.catId) {
             HStack(spacing: 5) {
-                // カテゴリ色丸カウント 17pt 白字 fs10.5 w800（count 変化でポップ）。
+                // セクション色丸カウント 17pt 白字 fs10.5 w800（count 変化でポップ）。
                 Text("\(g.count)")
                     .font(AppFont.rounded(size: 10.5, weight: .heavy))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 4)
                     .frame(minWidth: 17, minHeight: 17)
-                    .background(cat.color, in: Circle())
+                    .background(section.color, in: Circle())
                     .id(g.count)
                     .transition(.scale.combined(with: .opacity))
-                Text(cat.name)
+                Text(preset.label)
                     .font(AppFont.rounded(size: 12, weight: .heavy))
                     .foregroundStyle(tokens.text)
                     .fixedSize()
                 Button {
                     withAnimation(.spring(response: 0.36, dampingFraction: 0.7)) {
-                        model.removeLastOfCategory(g.catId)
+                        model.removeLastOfPreset(g.presetId)
                     }
                 } label: {
                     Image(systemName: "xmark")
@@ -512,14 +495,14 @@ struct AddSheet: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(cat.name) を1つ取り消し")
+                .accessibilityLabel("\(preset.label) を1つ取り消し")
             }
             .padding(.leading, 5)
             .padding(.trailing, 6)
             .padding(.vertical, 4)
             .background(tokens.surface, in: Capsule())
             .overlay(
-                Capsule().strokeBorder(mixWithTransparent(cat.color, fractionOfFirst: 0.33), lineWidth: 1)
+                Capsule().strokeBorder(mixWithTransparent(section.color, fractionOfFirst: 0.33), lineWidth: 1)
             )
             .shadow(color: Color(.sRGB, red: 80 / 255, green: 65 / 255, blue: 40 / 255, opacity: 0.10),
                     radius: 1, x: 0, y: 1)
@@ -585,8 +568,8 @@ struct AddSheet: View {
     private var confirmList: some View {
         ScrollView {
             VStack(spacing: 0) {
-                ForEach(AddGroups.resolved) { g in
-                    confirmSection(g)
+                ForEach(FoodCategory.all) { section in
+                    confirmSection(section)
                 }
                 // 末尾「＋ 食べものを選び直す」（破線・選ぶへ戻る）。
                 Button {
@@ -618,16 +601,13 @@ struct AddSheet: View {
     }
 
     @ViewBuilder
-    private func confirmSection(_ g: AddGroup) -> some View {
+    private func confirmSection(_ section: FoodCategory) -> some View {
         // このセクションに属するかご内アイテム（追加順）。
-        let items = model.grouped
-            .filter { g.ids.contains($0.catId) }
-            .sorted { $0.lastOrder > $1.lastOrder }
-            .flatMap(\.items)
+        let items = model.itemsInSection(section.id)
         if !items.isEmpty {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Text(g.label)
+                    Text(section.name)
                         .font(AppFont.rounded(size: 12, weight: .heavy))
                         .foregroundStyle(tokens.brandInk)
                     Rectangle()

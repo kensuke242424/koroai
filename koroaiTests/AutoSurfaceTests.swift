@@ -241,7 +241,7 @@ struct AutoSurfaceTests {
         let context = try TestSupport.makeContext()
         item(context, "fish", daysLeft: -2)   // 期限切れ
         item(context, "veg", daysLeft: -1)     // 期限切れ
-        item(context, "leafy", daysLeft: 0)    // 今日（残す）
+        item(context, "meat", daysLeft: 0)     // 今日（残す）
         item(context, "dairy", daysLeft: 3)    // 残す
         ate(context, y: 2026, m: 6, d: 1)      // ログ1件
         ate(context, y: 2026, m: 5, d: 1)      // ログ1件
@@ -285,27 +285,26 @@ struct AutoSurfaceTests {
         ate(context, y: 2026, m: 5, d: 1)
         try context.save()
 
-        ReturnActions.replaceAllItems(with: ["leafy", "dairy"], context: context, now: now(), calendar: cal())
+        ReturnActions.replaceAllItems(with: ["veg", "dairy"], context: context, now: now(), calendar: cal())
 
         let items = try context.fetch(FetchDescriptor<FoodItem>())
         #expect(items.count == 2)
         let byCat = Dictionary(uniqueKeysWithValues: items.map { ($0.catId, $0) })
-        // FoodItem.make の既定（名前＝カテゴリ defaultName・日数＝defaultDays）。
-        let leafy = try #require(byCat["leafy"])
-        #expect(leafy.name == FoodCategory.find("leafy")!.defaultName)
-        #expect(leafy.daysLeft(now: now(), calendar: cal()) == FoodCategory.find("leafy")!.defaultDays)
+        // FoodItem.make の既定（名前＝セクション defaultName・日数＝defaultDays）。
+        let veg = try #require(byCat["veg"])
+        #expect(veg.name == FoodCategory.find("veg")!.defaultName)
+        #expect(veg.daysLeft(now: now(), calendar: cal()) == FoodCategory.find("veg")!.defaultDays)
         // ログは保持。
         #expect(try context.fetch(FetchDescriptor<ConsumptionLog>()).count == 1)
     }
 
     @Test func perishableCategoriesForReenterExcludeEgg() {
-        // 入れ直しシートは生鮮（perishable==true）のみ。卵だけが非生鮮。
-        // 注: 仕様書本文は「10種」と記すが、ハンドオフ fk-data.js の正は egg のみ非生鮮＝11種。
-        //     実装は perishable フラグで出し分けるため、データ（11種）に追従する。
+        // 入れ直しシートは生鮮（perishable==true）のみ。10セクション中、卵だけが非生鮮＝9種。
+        // 実装は perishable フラグで出し分けるため、セクション定義に追従する。
         let perishable = FoodCategory.all.filter(\.perishable)
-        #expect(perishable.count == 11)
+        #expect(perishable.count == 9)
         #expect(!perishable.contains { $0.id == "egg" })
-        #expect(FoodCategory.all.count == 12)
+        #expect(FoodCategory.all.count == 10)
     }
 
     // MARK: - オンボーディング投入

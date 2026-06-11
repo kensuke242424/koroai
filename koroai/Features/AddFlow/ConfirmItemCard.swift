@@ -21,7 +21,9 @@ struct ConfirmItemCard: View {
     @State private var calendarOpen = false
 
     private var category: FoodCategory? { FoodCategory.find(item.catId) }
-    private var defaultName: String { category?.defaultName ?? category?.name ?? "" }
+    private var preset: IngredientPreset? { IngredientCatalog.find(item.presetId) }
+    /// プレースホルダー名。プリセット既定名を優先し、引けないときはセクション既定名へフォールバック。
+    private var defaultName: String { preset?.name ?? category?.defaultName ?? category?.name ?? "" }
 
     // 名前: モデルへ書き戻す Binding。
     private var nameBinding: Binding<String> {

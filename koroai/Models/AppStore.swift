@@ -7,6 +7,24 @@
 import Foundation
 import SwiftUI
 
+/// 食材プリセット（IngredientCatalog）の既定値に対する、ユーザーのカスタム上書き。
+/// プリセット既定と異なる入力だけを保存し、次回タイルタップ時に自動適用する。
+/// 各フィールドは nil = カスタムなし（プリセット既定のまま）を意味する。
+struct PresetCustomDefault: Codable, Equatable {
+    /// プリセット名と異なる入力名（trim 済み・空は nil）。
+    var name: String?
+    var days: Int?
+    /// AmountMode.rawValue（"amount" / "count"）。
+    var amountMode: String?
+    var amount: Double?
+    var quantity: Int?
+
+    /// 全フィールド nil なら「カスタムなし」。
+    var isEmpty: Bool {
+        name == nil && days == nil && amountMode == nil && amount == nil && quantity == nil
+    }
+}
+
 @Observable
 @MainActor
 final class AppStore {
@@ -19,6 +37,7 @@ final class AppStore {
         static let showAchievementCard = "settings.showAchievementCard"
         static let showWeeklySummary = "settings.showWeeklySummary"
         static let amountModeOverrides = "settings.amountModeOverrides"
+        static let presetCustomDefaults = "settings.presetCustomDefaults"
         static let notificationsEnabled = "settings.notificationsEnabled"
         static let digestHour = "settings.digestHour"
         static let digestMinute = "settings.digestMinute"
@@ -112,6 +131,17 @@ final class AppStore {
         didSet { defaults.set(amountModeOverrides, forKey: Keys.amountModeOverrides) }
     }
 
+    /// 食材プリセット別のカスタム既定値（key=presetId）。
+    /// プリセット既定と異なる入力で追加すると commit 時に記憶し、次回タイルタップで自動適用する。
+    /// 辞書全体を JSONEncoder で Data 1本にして UserDefaults へ書く（amountModeOverrides と同じ didSet 流儀）。
+    private var presetCustomDefaults: [String: PresetCustomDefault] {
+        didSet {
+            if let data = try? JSONEncoder().encode(presetCustomDefaults) {
+                defaults.set(data, forKey: Keys.presetCustomDefaults)
+            }
+        }
+    }
+
     private let defaults: UserDefaults
 
     /// - Parameter defaults: 注入可能（テスト・プレビュー用）。既定は .standard。
@@ -124,6 +154,8 @@ final class AppStore {
         showAchievementCard = defaults.object(forKey: Keys.showAchievementCard) as? Bool ?? true
         showWeeklySummary = defaults.object(forKey: Keys.showWeeklySummary) as? Bool ?? true
         amountModeOverrides = (defaults.dictionary(forKey: Keys.amountModeOverrides) as? [String: String]) ?? [:]
+        presetCustomDefaults = (defaults.data(forKey: Keys.presetCustomDefaults))
+            .flatMap { try? JSONDecoder().decode([String: PresetCustomDefault].self, from: $0) } ?? [:]
         // 通知設定の既定: notificationsEnabled true / digest 8:00 / leadDays 1 / showMonthlyResult true
         notificationsEnabled = defaults.object(forKey: Keys.notificationsEnabled) as? Bool ?? true
         digestHour = defaults.object(forKey: Keys.digestHour) as? Int ?? 8
@@ -147,5 +179,21 @@ final class AppStore {
     /// 指定カテゴリの残量モード上書きを保存する。
     func setAmountModeOverride(_ mode: AmountMode, for catId: String) {
         amountModeOverrides[catId] = mode.rawValue
+    }
+
+    // MARK: - プリセット別カスタム既定値
+
+    /// 指定プリセットのカスタム既定値（未設定なら nil）。
+    func customDefault(for presetId: String) -> PresetCustomDefault? {
+        presetCustomDefaults[presetId]
+    }
+
+    /// 指定プリセットのカスタム既定値を保存する。nil または全フィールド空なら辞書から削除（既定へ戻したらリセット）。
+    func setCustomDefault(_ value: PresetCustomDefault?, for presetId: String) {
+        if let value, !value.isEmpty {
+            presetCustomDefaults[presetId] = value
+        } else {
+            presetCustomDefaults.removeValue(forKey: presetId)
+        }
     }
 }
