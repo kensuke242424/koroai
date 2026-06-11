@@ -39,7 +39,9 @@ struct AddSheet: View {
                 detent: $detent,
                 extendContentUnderHomeIndicator: true, // 下部トレイを画面下端まで敷く（デザイン準拠）
                 onDismissRequest: { handleDismiss() },
-                detentDragActive: $sheetDragging
+                detentDragActive: $sheetDragging,
+                // large 時の下スワイプ先勝ち判定（表示中画面のスクロールが最上部か）。
+                contentAtTop: { model.screen == .select ? selectScrollY <= 1 : confirmScrollY <= 1 }
             ) {
                 track
             }
@@ -85,6 +87,8 @@ struct AddSheet: View {
     /// didInitPresentation で1回にガードする（reset の二重実行でカゴが消えるのを防ぐ）。
     @State private var didInitPresentation = false
     @State private var selectScrollY: CGFloat = 0
+    /// 確認画面のスクロール量（large 時の下スワイプ先勝ち判定用）。
+    @State private var confirmScrollY: CGFloat = 0
 
     /// 折りたたみ中セクションの id 集合（"recent" ＋ FoodCategory.id）。
     /// 既定は「最近使った食材」だけ展開・他は全部折りたたみ。表示ごとにリセット（永続化しない）。
@@ -103,6 +107,7 @@ struct AddSheet: View {
         detent = .medium
         chipRowShown = false
         selectScrollY = 0
+        confirmScrollY = 0
         // 最近使った食材（最大9枚・解決できない id はスキップ）。
         recentPresets = Array(store.recentPresetIds.compactMap { IngredientCatalog.find($0) }.prefix(9))
         // 既定の開閉: 「最近使った食材」のみ展開・他セクションは折りたたみ。
@@ -302,7 +307,9 @@ struct AddSheet: View {
             }
             .coordinateSpace(name: "addSelectScroll")
             // medium 中は内部スクロール不可（detent ドラッグと競合させない＝先勝ちで大化させる）。
-            .scrollDisabled(detent == .medium)
+            // detent ドラッグ係合中（sheetDragging）も止めて、進行中のスクロールパンを
+            // キャンセルして detent へ引き継ぐ（large・最上部の下スワイプ）。
+            .scrollDisabled(detent == .medium || sheetDragging)
             .onPreferenceChange(ScrollOffsetKey.self) { y in
                 // iOS 17 用フォールバック。iOS 18+ は onScrollGeometryChange（下の modifier）で取得する。
                 if #unavailable(iOS 18.0) {
@@ -341,7 +348,9 @@ struct AddSheet: View {
             VStack(spacing: 0) {
                 if !collapsed {
                     tileGrid(presets)
-                        .padding(.bottom, 2)
+                        .padding(.top, 2)
+                        // 展開グリッドと次セクション見出しの間にゆとり。
+                        .padding(.bottom, 12)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -360,7 +369,7 @@ struct AddSheet: View {
         Button(action: onTap) {
             HStack(spacing: 8) {
                 Text(label)
-                    .font(AppFont.rounded(size: 12.5, weight: .heavy))
+                    .font(AppFont.rounded(size: 14.5, weight: .heavy))
                     .foregroundStyle(tokens.brandInk)
                 // 折りたたみ中・選択ありのときだけ件数バッジ。
                 if collapsed, selectedCount > 0 {
@@ -380,7 +389,8 @@ struct AddSheet: View {
                     .rotationEffect(.degrees(collapsed ? -90 : 0))
             }
             .padding(.horizontal, 2)
-            .frame(minHeight: Layout.minTapTarget)
+            // 詰めつめ感を避けるため、44pt より少しゆとりを持たせる。
+            .frame(minHeight: 52)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -693,6 +703,15 @@ struct AddSheet: View {
 
     private var confirmList: some View {
         ScrollView {
+            // スクロール量をオフセットで取得（iOS 17 互換 PreferenceKey。selectScreen と同じ構造）。
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: ScrollOffsetKey.self,
+                    value: -geo.frame(in: .named("addConfirmScroll")).minY
+                )
+            }
+            .frame(height: 0)
+
             VStack(spacing: 0) {
                 ForEach(FoodCategory.all) { section in
                     confirmSection(section)
@@ -723,8 +742,16 @@ struct AddSheet: View {
             // 下部トレイに隠れない余白。
             .padding(.bottom, 100)
         }
-        // medium 中は内部スクロール不可（detent ドラッグと競合させない）。
-        .scrollDisabled(detent == .medium)
+        .coordinateSpace(name: "addConfirmScroll")
+        // medium 中は内部スクロール不可。detent ドラッグ係合中（sheetDragging）も止めて、
+        // 進行中のスクロールパンをキャンセルして detent へ引き継ぐ（large・最上部の下スワイプ）。
+        .scrollDisabled(detent == .medium || sheetDragging)
+        .onPreferenceChange(ScrollOffsetKey.self) { y in
+            if #unavailable(iOS 18.0) {
+                if abs(confirmScrollY - y) > 1 { confirmScrollY = y }
+            }
+        }
+        .modifier(ScrollOffsetObserver(scrollY: $confirmScrollY))
         .frame(maxHeight: .infinity)
     }
 

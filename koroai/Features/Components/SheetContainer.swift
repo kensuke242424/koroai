@@ -36,7 +36,12 @@ struct SheetContainer<Content: View>: View {
     /// パネル全体の detent ドラッグが進行中（＋指を離した直後の猶予）かどうかを親へ伝える。
     /// シートが指に追従して動くため、ローカル座標では移動量ほぼゼロ＝離した地点の
     /// ボタンにタップ判定が入ってしまう。親はタップ系アクションをこのフラグで抑止する。
+    /// また親はこのフラグで scrollDisabled を立て、進行中のスクロールパンをキャンセルして
+    /// detent ドラッグへ引き継ぐ（large・最上部からの下スワイプ用）。
     var detentDragActive: Binding<Bool>? = nil
+    /// コンテンツのスクロールが最上部にあるか（large 時の下スワイプ係合判定に使う）。
+    /// nil なら large からのパネルドラッグは係合しない（従来挙動）。
+    var contentAtTop: (() -> Bool)? = nil
     @ViewBuilder var content: () -> Content
 
     @Environment(\.tokens) private var tokens
@@ -189,7 +194,8 @@ struct SheetContainer<Content: View>: View {
 
     /// パネル全体（content 含む）に重ねる detent ドラッグ。
     /// medium のとき、シート内のどこを上にスワイプしても先に detent を large にする。
-    /// - 発火条件: detentFractions あり・ドラッグ開始時の detent が .medium。
+    /// large のときは、コンテンツ最上部からの下スワイプに限り detent を先勝ちさせて medium へ。
+    /// - 発火条件: detentFractions あり。medium は縦優勢なら両向き、large は最上部×下向きのみ。
     /// - 縦優勢判定（初動で |dy| > |dx| のときだけ係合）でチップ横スクロール／タップを壊さない。
     /// - 座標は .global（ハンドルと同じ＝自己フィードバック発振防止）。
     /// - 高さ計算・スナップは handleZone と同じ applyDetentDrag / snapDetent を再利用する。
@@ -199,13 +205,19 @@ struct SheetContainer<Content: View>: View {
                 guard detentFractions != nil, let detent else { return }
                 // 1ドラッグ内で最初の onChanged のときだけ係合判定する。
                 if panelDragEngaged == nil {
-                    // 開始時に medium でなければ最初から見送り（large はここでは扱わない）。
-                    guard detent.wrappedValue == .medium else {
-                        panelDragEngaged = false
-                        return
+                    let vertical = abs(value.translation.height) > abs(value.translation.width)
+                    switch detent.wrappedValue {
+                    case .medium:
+                        // medium: 縦優勢ならどちら向きでも係合（横／斜めは見送り）。
+                        panelDragEngaged = vertical
+                    case .large:
+                        // large: コンテンツ最上部からの下方向ドラッグだけ係合
+                        // （それ以外は内部スクロールに任せる）。係合すると親が
+                        // detentDragActive 経由で scrollDisabled を立て、進行中の
+                        // スクロールパンはキャンセルされて detent ドラッグに引き継がれる。
+                        let downward = value.translation.height > 0
+                        panelDragEngaged = vertical && downward && (contentAtTop?() ?? false)
                     }
-                    // 縦優勢のときだけ係合（横／斜めは見送り）。
-                    panelDragEngaged = abs(value.translation.height) > abs(value.translation.width)
                     if panelDragEngaged == true {
                         detentDragActive?.wrappedValue = true
                         suppressGeneration += 1
