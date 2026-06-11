@@ -26,7 +26,7 @@ xcodebuild test -project koroai.xcodeproj -scheme koroai \
 ```
 
 DEBUG 起動引数（スクショ・検証用。新規インストール直後でも onboarded を立てて直行する）:
-`-seedPreviewData`（空DBにシード投入）/ `-noNotifyPrompt` / `-openAddSheet` / `-openAddConfirm` /
+`-seedPreviewData`（空DBにシード投入）/ `-noNotifyPrompt` / `-openAddSheet` / `-openAddConfirm` / `-openCloseConfirm`（カゴに3品積んで閉じ確認を表示）/
 `-autoAddOne <catId>`（表示1.2秒後にタイルタップと同経路で1件追加・録画検証用）/
 `-openEditFirst` / `-openDigest` / `-openReview` / `-openSettings` / `-openOnboarding` /
 `-openReturn` / `-openMonthResult` / `-scrollHome`
