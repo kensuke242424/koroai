@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ころあい — 追加フロー（選ぶ→確認）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html,body{margin:0;height:100%;background:#e7ddc9;}
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;gap:46px;flex-wrap:wrap;}
+  .pf{font-family:"M PLUS Rounded 1c",system-ui;}
+  .cap{font-family:"M PLUS Rounded 1c",system-ui;max-width:300px;}
+  .cap .lead{font-size:12px;font-weight:800;letter-spacing:2px;color:#b8604a;text-transform:uppercase;margin-bottom:8px;}
+  .cap h1{font-size:24px;font-weight:800;color:#3a342b;margin:0 0 12px;}
+  .cap p{font-size:13.5px;font-weight:600;color:#7c7363;line-height:1.7;margin:0 0 14px;}
+  .cap .step{display:flex;gap:10px;margin-bottom:11px;}
+  .cap .num{width:24px;height:24px;border-radius:50%;background:#41614a;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .cap .st{font-size:13px;font-weight:600;color:#7c7363;line-height:1.55;}
+  .cap .st b{color:#3a342b;font-weight:800;}
+  @keyframes chipIn{from{max-width:0;opacity:0;transform:scale(.8);margin-right:-7px;}55%{opacity:1;}to{max-width:240px;opacity:1;transform:scale(1);margin-right:0;}}
+  @keyframes pop{from{transform:scale(.45);}to{transform:scale(1);}}
+  .chiptray{scrollbar-width:thin;scrollbar-color:rgba(70,55,30,0.22) transparent;}
+  .chiptray::-webkit-scrollbar{height:3px;}
+  .chiptray::-webkit-scrollbar-thumb{background:rgba(70,55,30,0.22);border-radius:3px;}
+  .chiptray::-webkit-scrollbar-track{background:transparent;}
+</style>
+<script type="text/babel">
+const { useState, useRef } = React;
+const T = {
+  bg:'#f3ede2', sheet:'#ece3d2', surface:'#fffdf8', surface2:'#e7dcc8',
+  text:'#3a342b', sec:'#8c8273', ter:'#b3aa98',
+  green:'#6f8f6a', greenInk:'#41614a', greenSoft:'#e0e9d4',
+  blue:'#5f93a2', accent:'#b8604a', accentDk:'#9e4d3a',
+  hair:'rgba(70,55,30,0.10)', shadow:'rgba(80,65,40,0.10)',
+};
+let _id = 0;
+const CATS = {
+  fish:{name:'魚・刺身', glyph:'魚', color:'#5f93a2', days:1, unit:'切', mode:'amount'},
+  chicken:{name:'鶏肉', glyph:'鶏', color:'#d98a66', days:2, unit:'パック', mode:'amount'},
+  meat:{name:'豚・牛肉', glyph:'肉', color:'#c06a5a', days:3, unit:'パック', mode:'amount'},
+  leafy:{name:'葉物野菜', glyph:'菜', color:'#7fa257', days:3, unit:'束', mode:'amount'},
+  veg:{name:'野菜', glyph:'野', color:'#8aa86e', days:5, unit:'個', mode:'count'},
+  mush:{name:'きのこ', glyph:'茸', color:'#ab8d68', days:4, unit:'パック', mode:'amount'},
+  fruit:{name:'果物', glyph:'果', color:'#d6a04f', days:5, unit:'個', mode:'count'},
+  dairy:{name:'牛乳・乳製品', glyph:'乳', color:'#c9b487', days:5, unit:'本', mode:'amount'},
+  tofu:{name:'豆腐・納豆', glyph:'豆', color:'#b3ad74', days:4, unit:'丁', mode:'count'},
+  egg:{name:'卵', glyph:'卵', color:'#cbb06f', days:14, unit:'個', mode:'count'},
+  bread:{name:'パン', glyph:'パ', color:'#caa06a', days:4, unit:'枚', mode:'count'},
+  deli:{name:'惣菜・弁当', glyph:'惣', color:'#c98a4f', days:2, unit:'個', mode:'count'},
+};
+const GROUPS = [
+  { label:'肉・魚介', ids:['fish','chicken','meat'] },
+  { label:'野菜・きのこ', ids:['leafy','veg','mush'] },
+  { label:'果物・乳製品', ids:['fruit','dairy'] },
+  { label:'大豆製品・卵', ids:['tofu','egg'] },
+  { label:'主食・惣菜', ids:['bread','deli'] },
+];
+const Glyph = ({ id, size=30 }) => { const c=CATS[id]; return (
+  <span style={{ width:size, height:size, borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:size*0.42, fontWeight:800, background:c.color+'33', color:'#4a3f2c' }}>{c.glyph}</span>
+); };
+
+/* ── 端末 ── */
+function Phone({ children }) {
+  return (
+    <div style={{ width:320, height:680, borderRadius:46, background:'#15130f', padding:11, boxShadow:'0 20px 46px rgba(20,14,6,0.28)' }}>
+      <div className="pf" style={{ width:'100%', height:'100%', borderRadius:36, overflow:'hidden', position:'relative', background:T.bg }}>
+        <div style={{ position:'absolute', top:9, left:'50%', transform:'translateX(-50%)', width:100, height:22, background:'#15130f', borderRadius:14, zIndex:30 }} />
+        {children}
+      </div>
+    </div>
+  );
+}
+const SB = () => <div className="pf" style={{ height:38, display:'flex', alignItems:'flex-end', justifyContent:'space-between', padding:'0 20px 4px', color:T.text, fontSize:12, fontWeight:700, flexShrink:0 }}><span>9:41</span><span style={{ color:T.sec, fontSize:10 }}>●●●</span></div>;
+
+/* ════════ 画面1：選ぶ ════════ */
+function SelectScreen({ cart, add, removeOneOfCat, onConfirm, onClose }) {
+  const count = cart.length;
+  const countByCat = (id) => cart.filter(i=>i.catId===id).length;
+  const grouped = (()=>{ const m=new Map(); cart.forEach(it=>{ const g=m.get(it.catId)||{catId:it.catId,count:0,lastId:0}; g.count++; g.lastId=Math.max(g.lastId,it.id); m.set(it.catId,g); }); return [...m.values()].sort((a,b)=>b.lastId-a.lastId); })();
+  return (
+    <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 18px 8px', flexShrink:0 }}>
+        <span style={{ width:30, height:30, borderRadius:'50%', background:T.surface2, color:T.sec, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, cursor:'pointer' }} onClick={onClose}>✕</span>
+        <span style={{ fontSize:16, fontWeight:800, color:T.text }}>食べものを追加</span>
+        <span style={{ width:30 }} />
+      </div>
+      <div style={{ flex:1, overflowY:'auto', padding:'2px 16px 120px' }}>
+        {GROUPS.map((g)=>(
+          <div key={g.label}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, margin:'13px 2px 8px' }}>
+              <span style={{ fontSize:11.5, fontWeight:800, color:T.greenInk }}>{g.label}</span>
+              <span style={{ flex:1, height:1, background:T.hair }} />
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:9 }}>
+              {g.ids.map((id)=>{ const n=countByCat(id); const c=CATS[id]; return (
+                <button key={id} onClick={()=>add(id)} className="pf" style={{ position:'relative', border: n>0?`1.5px solid ${c.color}`:'1.5px solid transparent', background: n>0?`color-mix(in oklab,${c.color} 12%,${T.surface})`:T.surface, borderRadius:16, cursor:'pointer', padding:'11px 4px 9px', display:'flex', flexDirection:'column', alignItems:'center', gap:6, boxShadow:'0 1px 3px '+T.shadow }}>
+                  <span style={{ position:'absolute', top:5, right:5, minWidth:17, height:17, borderRadius:999, background: n>0?c.color:'rgba(70,55,30,0.08)', color: n>0?'#fff':T.ter, fontSize:10.5, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px' }}>{n>0?n:'＋'}</span>
+                  <Glyph id={id} size={34} />
+                  <span style={{ fontSize:10.5, fontWeight:700, color:T.text, textAlign:'center', lineHeight:1.15 }}>{c.name}</span>
+                </button>
+              ); })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* bottom: カゴtray＋confirm */}
+      <div style={{ position:'absolute', left:0, right:0, bottom:0, paddingBottom:'calc(14px + env(safe-area-inset-bottom))', background:`linear-gradient(transparent, ${T.bg} 22%)` }}>
+        {count>0 && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px 10px' }}>
+            <span style={{ fontSize:16, flexShrink:0, lineHeight:'24px' }}>🧺</span>
+            <div className="chiptray" style={{ display:'flex', alignItems:'center', gap:7, overflowX:'auto', flex:1, minWidth:0, paddingTop:5, paddingBottom:5, WebkitOverflowScrolling:'touch' }}>
+            {grouped.map((g)=>{ const c=CATS[g.catId]; return (
+              <span key={g.catId} className="pf" style={{ display:'flex', alignItems:'center', gap:5, flexShrink:0, overflow:'hidden', whiteSpace:'nowrap', background:T.surface, border:`1px solid ${c.color}55`, borderRadius:999, padding:'4px 6px 4px 5px', boxShadow:'0 1px 2px '+T.shadow, animation:'chipIn .36s cubic-bezier(.25,.85,.3,1)' }}>
+                <span key={g.count} style={{ minWidth:17, height:17, borderRadius:'50%', flexShrink:0, background:c.color, color:'#fff', fontSize:10.5, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', animation:'pop .22s cubic-bezier(.3,1.3,.5,1)' }}>{g.count}</span>
+                <span style={{ fontSize:12, fontWeight:800, color:T.text }}>{c.name}</span>
+                <span onClick={()=>removeOneOfCat(g.catId)} style={{ width:17, height:17, borderRadius:'50%', background:'rgba(70,55,30,0.08)', color:T.sec, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, cursor:'pointer', flexShrink:0 }}>✕</span>
+              </span>
+            ); })}
+            </div>
+          </div>
+        )}
+        <div style={{ padding:'0 16px' }}>
+          <button onClick={count>0?onConfirm:undefined} className="pf" style={{ width:'100%', border:'none', cursor:count>0?'pointer':'default', borderRadius:16, padding:'15px 0', background:count>0?T.accent:T.surface2, color:count>0?'#fff':T.ter, fontWeight:800, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', gap:9, boxShadow:count>0?`0 6px 18px color-mix(in oklab,${T.accent} 32%,transparent)`:'none', transition:'all .2s' }}>
+            確認する{count>0?`（${count}品）`:''}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 確認画面の各アイテム ── */
+const STOPS=[{l:'わずか',f:0.12},{l:'少し',f:0.3},{l:'半分',f:0.5},{l:'多め',f:0.72},{l:'満タン',f:1}];
+const nearest=(f)=>STOPS.reduce((a,b)=>Math.abs(b.f-f)<Math.abs(a.f-f)?b:a);
+
+/* インライン・ミニカレンダー（日付→もち日数） */
+const WD=['日','月','火','水','木','金','土'];
+function MiniCal({ days, onPick }) {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const sel=new Date(today); sel.setDate(today.getDate()+Math.max(0,days));
+  const [vm,setVm]=useState(new Date(sel.getFullYear(), sel.getMonth(), 1));
+  const y=vm.getFullYear(), m=vm.getMonth();
+  const startWd=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate();
+  const cells=[]; for(let i=0;i<startWd;i++) cells.push(null); for(let d=1;d<=dim;d++) cells.push(new Date(y,m,d));
+  const same=(a,b)=>a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+  const diff=(d)=>Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-today)/86400000);
+  const nav={ width:20, height:20, borderRadius:6, background:'rgba(70,55,30,0.06)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, cursor:'pointer' };
+  return (
+    <div style={{ background:T.bg, borderRadius:11, padding:'8px 9px', marginTop:8 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
+        <span style={nav} onClick={()=>setVm(new Date(y,m-1,1))}>‹</span>
+        <span style={{ fontSize:11, fontWeight:800 }}>{y}年 {m+1}月</span>
+        <span style={nav} onClick={()=>setVm(new Date(y,m+1,1))}>›</span>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
+        {WD.map((w,i)=><div key={w} style={{ textAlign:'center', fontSize:8.5, fontWeight:800, color:i===0?T.accent:i===6?T.blue:T.ter }}>{w}</div>)}
+        {cells.map((d,i)=>{ if(!d) return <div key={i} />; const past=diff(d)<0, isSel=same(d,sel), isToday=same(d,today); return (
+          <button key={i} disabled={past} onClick={()=>onPick(diff(d))} className="pf" style={{ aspectRatio:'1', border:'none', borderRadius:7, cursor:past?'default':'pointer', background:isSel?T.accent:'transparent', color:isSel?'#fff':past?T.ter:T.text, opacity:past?0.34:1, fontSize:10, fontWeight:isSel||isToday?800:600, boxShadow:!isSel&&isToday?`inset 0 0 0 1.4px ${T.accent}`:'none' }}>{d.getDate()}</button>
+        ); })}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmItem({ item, onChange, onRemove }) {
+  const c = CATS[item.catId];
+  const [calOpen, setCalOpen] = useState(false);
+  const sbtn = { width:30, height:30, borderRadius:9, border:'none', cursor:'pointer', background:'rgba(70,55,30,0.06)', fontSize:16, fontWeight:700, color:T.text, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'inherit', flexShrink:0 };
+  const seg = (active) => ({ fontSize:10.5, fontWeight:800, borderRadius:7, padding:'4px 9px', cursor:'pointer', color:active?T.text:T.sec, background:active?T.surface:'transparent', boxShadow:active?'0 1px 2px '+T.shadow:'none' });
+  return (
+    <div className="pf" style={{ background:T.surface, borderRadius:16, padding:'12px 13px', marginBottom:10, boxShadow:'0 1px 3px '+T.shadow }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:11 }}>
+        <Glyph id={item.catId} size={36} />
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:9.5, fontWeight:700, color:T.ter }}>{c.name}</div>
+          <input value={item.name} onChange={(e)=>onChange({ ...item, name:e.target.value })} placeholder={c.name} className="pf" style={{ width:'100%', border:'none', background:'transparent', outline:'none', fontSize:16, fontWeight:800, color:T.text, padding:0 }} />
+          <div style={{ height:2, background:T.hair, borderRadius:2, marginTop:2 }} />
+        </div>
+        <span onClick={onRemove} style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, background:'rgba(70,55,30,0.05)', color:T.ter, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, cursor:'pointer' }}>✕</span>
+      </div>
+      {/* もち日数 + カレンダートグル */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <span style={{ fontSize:12.5, fontWeight:700, color:T.text }}>もち日数</span>
+        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+          <span onClick={()=>setCalOpen(o=>!o)} style={{ width:30, height:30, borderRadius:9, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:calOpen?'color-mix(in oklab,'+T.accent+' 14%,transparent)':'rgba(70,55,30,0.06)' }} title="カレンダーで指定">
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4" width="15" height="13.5" rx="3" stroke={calOpen?T.accent:T.sec} strokeWidth="1.6"/><path d="M2.5 8H17.5" stroke={calOpen?T.accent:T.sec} strokeWidth="1.6"/><path d="M6.5 2.5V5M13.5 2.5V5" stroke={calOpen?T.accent:T.sec} strokeWidth="1.6" strokeLinecap="round"/></svg>
+          </span>
+          <span style={sbtn} onClick={()=>onChange({ ...item, days:Math.max(0,item.days-1) })}>−</span>
+          <span style={{ fontSize:12, fontWeight:700, minWidth:46, textAlign:'center' }}>あと<b style={{ fontSize:16 }}>{item.days}</b>日</span>
+          <span style={sbtn} onClick={()=>onChange({ ...item, days:item.days+1 })}>＋</span>
+        </div>
+      </div>
+      {/* カレンダー：高さアニメーションで開閉 */}
+      <div style={{ display:'grid', gridTemplateRows: calOpen?'1fr':'0fr', opacity: calOpen?1:0, transition:'grid-template-rows .3s cubic-bezier(.3,.85,.3,1), opacity .26s ease', overflow:'hidden' }}>
+        <div style={{ minHeight:0, overflow:'hidden' }}>
+          <MiniCal days={item.days} onPick={(d)=>onChange({ ...item, days:d })} />
+        </div>
+      </div>
+      {/* 残量 + モード切替 */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', margin:'12px 0 8px' }}>
+        <span style={{ fontSize:12.5, fontWeight:700, color:T.text }}>残量</span>
+        <div style={{ display:'flex', gap:3, padding:3, background:T.surface2, borderRadius:9 }}>
+          <span style={seg(item.mode==='amount')} onClick={()=>onChange({ ...item, mode:'amount' })}>ざっくり量</span>
+          <span style={seg(item.mode==='count')} onClick={()=>onChange({ ...item, mode:'count' })}>個数</span>
+        </div>
+      </div>
+      {item.mode==='amount' ? (
+        <div>
+          <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', marginBottom:6 }}>
+            <span style={{ fontSize:11, fontWeight:800, color:T.green }}>{nearest(item.amt).l}</span>
+          </div>
+          <div style={{ display:'flex', gap:5 }}>
+            {STOPS.map((s)=>{ const on=item.amt>=s.f-0.001; return (
+              <button key={s.l} onClick={()=>onChange({ ...item, amt:s.f })} className="pf" style={{ flex:1, height:9, borderRadius:5, border:'none', cursor:'pointer', background: on?T.green:T.surface2 }} />
+            ); })}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+            <span style={sbtn} onClick={()=>onChange({ ...item, qty:Math.max(1,item.qty-1) })}>−</span>
+            <span style={{ fontSize:12, fontWeight:700, minWidth:42, textAlign:'center' }}><b style={{ fontSize:16 }}>{item.qty}</b> {c.unit}</span>
+            <span style={sbtn} onClick={()=>onChange({ ...item, qty:item.qty+1 })}>＋</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════ 画面2：確認・編集 ════════ */
+function ConfirmScreen({ cart, setCart, onBack, onCommit }) {
+  return (
+    <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', background:T.bg }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 14px 8px', flexShrink:0 }}>
+        <span onClick={onBack} style={{ display:'flex', alignItems:'center', gap:3, color:T.accent, fontSize:14, fontWeight:800, cursor:'pointer' }}>‹ 選び直す</span>
+        <span style={{ fontSize:16, fontWeight:800, color:T.text }}>内容を確認</span>
+        <span style={{ width:54 }} />
+      </div>
+      <div style={{ fontSize:12, fontWeight:600, color:T.sec, padding:'0 18px 8px', flexShrink:0 }}>名前・もち日数・残量を確認して追加できます。</div>
+      <div style={{ flex:1, overflowY:'auto', padding:'2px 16px 110px' }}>
+        {GROUPS.map((g)=>{ const items=cart.filter(it=>g.ids.includes(it.catId)); if(!items.length) return null; return (
+          <div key={g.label}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, margin:'10px 2px 9px' }}>
+              <span style={{ fontSize:11.5, fontWeight:800, color:T.greenInk }}>{g.label}</span>
+              <span style={{ flex:1, height:1, background:T.hair }} />
+            </div>
+            {items.map((it)=>(
+              <ConfirmItem key={it.id} item={it}
+                onChange={(n)=>setCart(cart.map(x=>x.id===it.id?n:x))}
+                onRemove={()=>setCart(cart.filter(x=>x.id!==it.id))} />
+            ))}
+          </div>
+        ); })}
+        <button onClick={onBack} className="pf" style={{ width:'100%', border:`1.5px dashed ${T.hair}`, cursor:'pointer', borderRadius:14, padding:'12px 0', background:'transparent', color:T.sec, fontWeight:800, fontSize:13.5, marginTop:6 }}>＋ 食べものを選び直す</button>
+      </div>
+      <div style={{ position:'absolute', left:0, right:0, bottom:0, padding:'12px 16px calc(14px + env(safe-area-inset-bottom))', background:`linear-gradient(transparent, ${T.bg} 26%)` }}>
+        <button onClick={onCommit} className="pf" style={{ width:'100%', border:'none', cursor:'pointer', borderRadius:16, padding:'15px 0', background:T.accent, color:'#fff', fontWeight:800, fontSize:16, boxShadow:`0 6px 18px color-mix(in oklab,${T.accent} 32%,transparent)` }}>冷蔵庫に追加（{cart.length}品）</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── 背景にうっすら見えるホーム ── */
+function HomeBehind() {
+  return (
+    <div className="pf" style={{ position:'absolute', inset:0, background:T.bg, display:'flex', flexDirection:'column' }}>
+      <div style={{ height:38, display:'flex', alignItems:'flex-end', justifyContent:'space-between', padding:'0 20px 4px', color:T.text, fontSize:12, fontWeight:700 }}><span>9:41</span><span style={{ color:T.sec, fontSize:10 }}>●●●</span></div>
+      <div style={{ padding:'4px 20px' }}>
+        <div style={{ fontSize:11, fontWeight:700, color:T.ter }}>こんにちは</div>
+        <div style={{ fontSize:21, fontWeight:800, color:T.text }}>今日の冷蔵庫</div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════ ルート（フル高さシート内のプッシュ遷移）════════ */
+function AddFlow() {
+  const [screen, setScreen] = useState('select'); // select | confirm
+  const [cart, setCart] = useState([]);
+  const [toast, setToast] = useState(null);
+  const [detent, setDetent] = useState('medium'); // medium | large
+  const [dragTop, setDragTop] = useState(null);
+  const drag = useRef(null);
+  const TOPS = { large: 52, medium: 252 };
+  const sheetTop = dragTop != null ? dragTop : TOPS[detent];
+  const onHandleDown = (e) => {
+    drag.current = { startY: e.clientY, base: TOPS[detent], moved: 0 };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const move = (ev) => { const dy = ev.clientY - drag.current.startY; drag.current.moved = dy; setDragTop(Math.max(40, Math.min(372, drag.current.base + dy))); };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      const dy = drag.current.moved; const finalTop = drag.current.base + dy; setDragTop(null);
+      if (Math.abs(dy) < 5) { setDetent(d => d === 'large' ? 'medium' : 'large'); return; } // tap toggles
+      setDetent(finalTop < (TOPS.large + TOPS.medium) / 2 ? 'large' : 'medium');
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const add = (catId) => { const c=CATS[catId]; setCart([...cart, { id:++_id, catId, name:'', days:c.days, mode:c.mode, amt:0.72, qty:1, unit:c.unit }]); };
+  const removeItem = (id) => setCart(cart.filter(x=>x.id!==id));
+  const removeOneOfCat = (catId) => { const items=cart.filter(i=>i.catId===catId); if(!items.length) return; const lastId=Math.max(...items.map(i=>i.id)); setCart(cart.filter(i=>i.id!==lastId)); };
+  const commit = () => { setToast(`冷蔵庫に ${cart.length}品 追加しました`); setTimeout(()=>{ setCart([]); setScreen('select'); setDetent('medium'); setToast(null); }, 1500); };
+  const reset = () => { setCart([]); setScreen('select'); setDetent('medium'); };
+  return (
+    <Phone>
+      <HomeBehind />
+      <div style={{ position:'absolute', inset:0, background:'rgba(40,30,16,0.32)' }} />
+      {/* 背の高いシート：中→大の2段detent。ハンドルをドラッグ/タップで切替 */}
+      <div style={{ position:'absolute', left:0, right:0, top:sheetTop, bottom:0, background:T.bg, borderRadius:'22px 22px 0 0', overflow:'hidden', boxShadow:'0 -10px 34px rgba(20,14,6,0.22)', transition: dragTop!=null ? 'none' : 'top .3s cubic-bezier(.3,.8,.3,1)' }}>
+        <div onPointerDown={onHandleDown} style={{ position:'absolute', left:0, right:0, top:0, height:26, zIndex:8, cursor:'grab', touchAction:'none', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ width:40, height:5, borderRadius:3, background:T.ter, opacity:0.5 }} />
+        </div>
+        <div style={{ position:'absolute', left:0, right:0, top:24, bottom:0 }}>
+          {/* push track */}
+          <div style={{ position:'absolute', inset:0, display:'flex', width:'200%', transform:`translateX(${screen==='confirm'?'-50%':'0'})`, transition:'transform .32s cubic-bezier(.3,.8,.3,1)' }}>
+            <div style={{ width:'50%', position:'relative' }}>
+              <SelectScreen cart={cart} add={add} removeOneOfCat={removeOneOfCat} onConfirm={()=>{ setScreen('confirm'); setDetent('large'); }} onClose={reset} />
+            </div>
+            <div style={{ width:'50%', position:'relative' }}>
+              {screen==='confirm' && <ConfirmScreen cart={cart} setCart={(c)=>{ setCart(c); if(c.length===0) setScreen('select'); }} onBack={()=>setScreen('select')} onCommit={commit} />}
+            </div>
+          </div>
+        </div>
+      </div>
+      {toast && <div className="pf" style={{ position:'absolute', bottom:20, left:'50%', transform:'translateX(-50%)', background:'#2a241a', color:'#fff', borderRadius:999, padding:'10px 18px', fontSize:12, fontWeight:800, whiteSpace:'nowrap', zIndex:40 }}>{toast}</div>}
+    </Phone>
+  );
+}
+
+function App() {
+  return (
+    <div id="stage">
+      <AddFlow />
+      <div className="cap">
+        <div className="lead">Koroai · Add flow</div>
+        <h1>選ぶ → 確認する</h1>
+        <p>登録モーダルの責務を「<b>選ぶ</b>」と「<b>確認・編集</b>」に分離。今回の2論点を反映しました。</p>
+        <div className="step"><span className="num">1</span><span className="st"><b>中→大の2段detentで開閉</b>。初期は中サイズ、グラブハンドルを<b>上にドラッグ／タップ</b>で大に拡張。確認画面へ進むと自動で大に。下スワイプで縮小・閉じる感覚はそのまま。</span></div>
+        <div className="step"><span className="num">2</span><span className="st"><b>カゴ（🧺）は左端に常時固定</b>。チップだけが横スクロールし、最新の選択が左から積まれる（ポップイン）。同カテゴリは<b>カウント集約</b>、✕で2以上なら−1・1なら削除。</span></div>
+        <div className="step"><span className="num">3</span><span className="st">確認画面は<b>カテゴリ別セクション</b>で整頓。名前・もち日数・残量を編集→<b>冷蔵庫に追加</b>。</span></div>
+        <p style={{ marginTop:4, fontSize:12.5, color:'#a59a86' }}>← 端末で操作できます（ハンドルをドラッグで大⇄中／タイルで追加→チップで取消→確認する）。</p>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</head>
+<body>
+<div id="root"></div>
+</body>
+</html>

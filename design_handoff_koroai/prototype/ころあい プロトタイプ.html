@@ -28,6 +28,12 @@
     100% { opacity: 0; transform: translateY(-6px) scale(0.99); }
   }
   @keyframes fkScrimIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fkChipIn { from { max-width:0; opacity:0; transform:scale(.8); margin-right:-7px; } 55% { opacity:1; } to { max-width:240px; opacity:1; transform:scale(1); margin-right:0; } }
+  @keyframes fkPop { from { transform:scale(.45); } to { transform:scale(1); } }
+  .fkChipTray { scrollbar-width: thin; scrollbar-color: rgba(70,55,30,0.22) transparent; }
+  .fkChipTray::-webkit-scrollbar { height: 3px; }
+  .fkChipTray::-webkit-scrollbar-thumb { background: rgba(70,55,30,0.22); border-radius: 3px; }
+  .fkChipTray::-webkit-scrollbar-track { background: transparent; }
   @keyframes fkSheetPop {
     from { transform: translateY(100%); }
     to   { transform: translateY(0); }

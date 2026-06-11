@@ -99,11 +99,11 @@ function FKCalIcon({ size = 15, color = 'currentColor' }) {
 
 // もち日数をカレンダーで設定（日付 → 日数に変換）
 function FKDatePicker({ days, onPick, dark, accent }) {
-  const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const startOfDay = (d) => {const x = new Date(d);x.setHours(0, 0, 0, 0);return x;};
   const today = startOfDay(new Date());
-  const selected = new Date(today); selected.setDate(today.getDate() + Math.max(0, days));
+  const selected = new Date(today);selected.setDate(today.getDate() + Math.max(0, days));
   const [vm, setVm] = React.useState(new Date(selected.getFullYear(), selected.getMonth(), 1));
-  const y = vm.getFullYear(), m = vm.getMonth();
+  const y = vm.getFullYear(),m = vm.getMonth();
   const startWd = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const cells = [];
@@ -159,241 +159,168 @@ function FKCalToggle({ open, onToggle }) {
     </button>);
 }
 
-// ── Add sheet : C+E + 登録詳細 — タイルタップで詳細→かごに追加 / リスト行タップで編集 ──
+// ── 確認画面の各カード（名前・もち日数＋カレンダー・残量モード切替）──
+function FKConfirmItem({ item, onChange, onRemove, dark, accent }) {
+  const c = window.FKD.fkCat(item.catId);
+  const [calOpen, setCalOpen] = React.useState(false);
+  const patch = (k) => (v) => onChange({ ...item, [k]: typeof v === 'function' ? v(item[k]) : v });
+  return (
+    <div style={{ background: 'var(--fk-surface)', borderRadius: 16, padding: '12px 14px', marginBottom: 10, boxShadow: '0 1px 3px rgba(80,65,40,0.10)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 12 }}>
+        <FKIcon cat={c} size={44} dark={dark} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--fk-text-ter)' }}>{c.name}</div>
+          <input value={item.name} onChange={(e) => onChange({ ...item, name: e.target.value })}
+          placeholder={`${FKdefName[c.id] || c.name}（任意）`} style={{
+            width: '100%', border: 'none', background: 'transparent', outline: 'none',
+            fontSize: 18, fontWeight: 800, color: 'var(--fk-text)', fontFamily: '"M PLUS Rounded 1c", system-ui', padding: 0
+          }} />
+          <div style={{ height: 2, background: 'var(--fk-hair)', borderRadius: 2, marginTop: 3 }} />
+        </div>
+        <span onClick={onRemove} style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: 'rgba(70,55,30,0.06)', color: 'var(--fk-text-ter)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, cursor: 'pointer' }}>✕</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--fk-text)' }}>もち日数</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span onClick={() => setCalOpen((o) => !o)} title="カレンダーで指定" style={{
+            width: 34, height: 34, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: calOpen ? `color-mix(in oklab, ${accent} 14%, transparent)` : 'rgba(70,55,30,0.06)'
+          }}>
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4" width="15" height="13.5" rx="3" stroke={calOpen ? accent : 'var(--fk-text-sec)'} strokeWidth="1.6" /><path d="M2.5 8H17.5" stroke={calOpen ? accent : 'var(--fk-text-sec)'} strokeWidth="1.6" /><path d="M6.5 2.5V5M13.5 2.5V5" stroke={calOpen ? accent : 'var(--fk-text-sec)'} strokeWidth="1.6" strokeLinecap="round" /></svg>
+          </span>
+          <FKStepper value={item.days} onChange={(v) => onChange({ ...item, days: v })} dark={dark} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateRows: calOpen ? '1fr' : '0fr', opacity: calOpen ? 1 : 0, transition: 'grid-template-rows .3s cubic-bezier(.3,.85,.3,1), opacity .26s ease', overflow: 'hidden' }}>
+        <div style={{ minHeight: 0, overflow: 'hidden', paddingTop: 10 }}>
+          <FKDatePicker days={item.days} onPick={(d) => onChange({ ...item, days: d })} dark={dark} accent={accent} />
+        </div>
+      </div>
+      <div style={{ height: 10 }} />
+      <FKAmtSection amtMode={item.amtMode} setAmtMode={patch('amtMode')} frac={item.amt} setFrac={patch('amt')}
+      qty={item.qty} setQty={patch('qty')} unit={item.unit} context="add" qtyTotal={item.qty} />
+    </div>);
+}
+
+// ── Add sheet : 二段プッシュ（選ぶ → 確認・編集）+ カゴのカウントチップ ──
 function FKAddSheet({ open, onClose, onAdd, onBatchDone, dark, tone, accent, copy }) {
   const [cart, setCart] = React.useState([]);
-  const [expanded, setExpanded] = React.useState(false);
+  const [screen, setScreen] = React.useState('select'); // 'select' | 'confirm'
   const [confirmClose, setConfirmClose] = React.useState(false);
-  const [view, setView] = React.useState('grid'); // 'grid' | 'detail'
-  const [cat, setCat] = React.useState(null);
-  const [name, setName] = React.useState('');
-  const [days, setDays] = React.useState(3);
-  const [amtMode, setAmtMode] = React.useState('amount');
-  const [amt, setAmt] = React.useState(1);
-  const [qty, setQty] = React.useState(5);
-  const [unit, setUnit] = React.useState('個');
-  const [editingId, setEditingId] = React.useState(null);
-  const [calOpen, setCalOpen] = React.useState(false);
 
-  React.useEffect(() => {if (open) {setCart([]);setExpanded(false);setConfirmClose(false);setView('grid');setEditingId(null);}}, [open]);
+  React.useEffect(() => {if (open) {setCart([]);setScreen('select');setConfirmClose(false);}}, [open]);
 
-  const openAdd = (c) => {
-    setEditingId(null);setCat(c);setName('');setDays(c.days);setCalOpen(false);
-    const m = window.FKD.FK_CAT_AMT_MODE[c.id] || 'amount';
-    setAmtMode(m);setAmt(1);setQty(5);setUnit(window.FKD.FK_CAT_UNIT[c.id] || '個');
-    setView('detail');
+  const addOne = (c) => {
+    const mode = window.FKD.FK_CAT_AMT_MODE[c.id] || 'amount';
+    const unit = window.FKD.FK_CAT_UNIT[c.id] || '個';
+    setCart((s) => [...s, FKmake(c.id, '', c.days, { amtMode: mode, amt: 0.72, qty: 1, qtyTotal: 1, unit })]);
   };
-  const openEdit = (it) => {
-    setEditingId(it.id);setCat(window.FKD.fkCat(it.catId));setName(it.name);setDays(it.days);setCalOpen(false);
-    setAmtMode(it.amtMode || 'amount');setAmt(it.amt != null ? it.amt : 1);
-    setQty(it.qty != null ? it.qty : 5);setUnit(it.unit || '個');
-    setView('detail');
-  };
-  const saveDetail = () => {
-    const nm = name.trim() || FKdefName[cat.id] || cat.name;
-    if (editingId) {
-      setCart((s) => s.map((x) => x.id === editingId ? { ...x, name: nm, days, amtMode, amt, qty, qtyTotal: qty, unit } : x));
-    } else {
-      setCart((s) => [...s, FKmake(cat.id, nm, days, { amtMode, amt, qty, qtyTotal: qty, unit })]);
-    }
-    setView('grid');
-  };
-  const deleteEditing = () => {setCart((s) => s.filter((x) => x.id !== editingId));setView('grid');};
-  const removeRow = (id) => setCart((s) => s.filter((x) => x.id !== id));
+  const removeOneOfCat = (catId) => setCart((s) => {
+    const ids = s.filter((i) => i.catId === catId).map((i) => i.id);
+    if (!ids.length) return s;
+    const last = Math.max(...ids);
+    return s.filter((i) => i.id !== last);
+  });
   const countOf = (catId) => cart.reduce((n, x) => n + (x.catId === catId ? 1 : 0), 0);
+  const updateItem = (id, next) => setCart((s) => s.map((x) => x.id === id ? next : x));
+  const removeItem = (id) => setCart((s) => s.filter((x) => x.id !== id));
+
+  const grouped = (() => {
+    const m = new Map();
+    cart.forEach((it) => {const g = m.get(it.catId) || { catId: it.catId, count: 0, lastId: 0 };g.count++;g.lastId = Math.max(g.lastId, it.id);m.set(it.catId, g);});
+    return [...m.values()].sort((a, b) => b.lastId - a.lastId);
+  })();
+
+  const sectionGroups = (() => {
+    const inSet = new Set(FK_ADD_GROUPS.flatMap((g) => g.ids));
+    const extras = FKcats.filter((c) => !inSet.has(c.id)).map((c) => c.id);
+    return extras.length ? [...FK_ADD_GROUPS, { key: 'other', label: 'その他', ids: extras }] : FK_ADD_GROUPS;
+  })();
 
   const commit = () => {
-    cart.forEach((it) => onAdd(it));
+    cart.forEach((it) => onAdd({ ...it, name: (it.name || '').trim() || FKdefName[it.catId] || window.FKD.fkCat(it.catId).name, qtyTotal: Math.max(it.qtyTotal || it.qty, it.qty) }));
     onBatchDone && onBatchDone(cart.length);
     onClose();
   };
   const requestClose = () => {cart.length ? setConfirmClose(true) : onClose();};
 
   return (
-    <FKSheet open={open} onClose={requestClose} dark={dark} height="84%">
-      {/* detail overlay — slides up OVER the grid; the cart list stays mounted underneath */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 8, pointerEvents: view === 'detail' ? 'auto' : 'none' }}>
-        <div onClick={() => setView('grid')} style={{ position: 'absolute', inset: 0, background: 'rgba(20,14,6,0.30)', opacity: view === 'detail' ? 1 : 0, transition: 'opacity .26s ease' }} />
-        <div style={{
-          position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '94%', overflowY: 'auto',
-          background: 'var(--fk-bg2)', borderRadius: '24px 24px 0 0', boxShadow: '0 -8px 30px rgba(20,14,6,0.28)',
-          transform: view === 'detail' ? 'translateY(0)' : 'translateY(112%)',
-          transition: 'transform .32s cubic-bezier(.22,.7,.3,1)'
-        }}>
-      {cat &&
-          <div style={{ display: 'flex', flexDirection: 'column', padding: '20px 22px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 20 }}>
-            <FKIcon cat={cat} size={64} dark={dark} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fk-text-ter)', marginBottom: 4 }}>{cat.name}</div>
-              <input value={name} onChange={(e) => setName(e.target.value)}
-                placeholder={`${FKdefName[cat.id]}（名前は任意）`} style={{
-                  width: '100%', border: 'none', background: 'transparent', outline: 'none',
-                  fontSize: 21, fontWeight: 800, color: 'var(--fk-text)',
-                  fontFamily: '"M PLUS Rounded 1c", system-ui', padding: 0
-                }} />
-              <div style={{ height: 2, background: 'var(--fk-hair)', borderRadius: 2, marginTop: 4 }} />
+    <FKSheet open={open} onClose={requestClose} dark={dark} height="88%">
+      <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', width: '200%', transform: `translateX(${screen === 'confirm' ? '-50%' : '0'})`, transition: 'transform .32s cubic-bezier(.3,.8,.3,1)' }}>
+
+          {/* ── 選ぶ ── */}
+          <div style={{ width: '50%', position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ padding: '10px 22px 6px', flexShrink: 0 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--fk-text)' }}>{copy.addTitle}</div>
+              <div style={{ fontSize: 13.5, color: 'var(--fk-text-sec)', marginTop: 3, fontWeight: 600 }}>カテゴリを選んでカゴへ。最後にまとめて確認します。</div>
             </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '0 2px 8px' }}>
-            <span style={{ width: 7, height: 7, borderRadius: 2, background: 'var(--fk-accent)' }} />
-            <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--fk-text)' }}>今日 {fkTodayStr()}</span>
-          </div>
-          <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'var(--fk-surface)', borderRadius: 18, padding: '14px 16px', marginBottom: 10
-            }}>
-            <div>
-              <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--fk-text)' }}>もち日数</div>
-              <div style={{ fontSize: 12.5, color: 'var(--fk-text-ter)', fontWeight: 600 }}>必要なら調整</div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '2px 18px 124px' }}>
+              {sectionGroups.map((g) =>
+              <div key={g.key}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 2px 9px' }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--fk-brand-ink)', letterSpacing: 0.4 }}>{g.label}</span>
+                    <span style={{ flex: 1, height: 1, background: 'var(--fk-hair)' }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 11 }}>
+                    {g.ids.map((id) => {const c = window.FKD.fkCat(id);return c ? <FKCatTile key={id} cat={c} dark={dark} addMode count={countOf(c.id)} onClick={() => addOne(c)} /> : null;})}
+                  </div>
+                </div>
+              )}
             </div>
-            <FKStepper value={days} onChange={setDays} dark={dark} />
-          </div>
-          <FKCalToggle open={calOpen} onToggle={() => setCalOpen((o) => !o)} />
-          {calOpen && <FKDatePicker days={days} onPick={setDays} dark={dark} accent={accent} />}
-
-          <div style={{ height: 6 }} />
-          <FKAmtSection amtMode={amtMode} setAmtMode={setAmtMode} frac={amt} setFrac={setAmt}
-            qty={qty} setQty={setQty} unit={unit} context="add" qtyTotal={qty} />
-
-          <div style={{ height: 8 }} />
-          <button onClick={saveDetail} style={{
-              border: 'none', cursor: 'pointer', borderRadius: 16, padding: '16px 0',
-              backgroundColor: accent, color: '#fff', fontWeight: 800, fontSize: 17,
-              fontFamily: '"M PLUS Rounded 1c", system-ui', marginBottom: 10,
-              boxShadow: `0 6px 18px ${accent}59`
-            }}>{editingId ? '更新する' : 'かごに追加'}</button>
-          <button onClick={editingId ? deleteEditing : () => setView('grid')} style={{
-              border: 'none', cursor: 'pointer', borderRadius: 16, padding: '13px 0',
-              background: 'transparent', color: editingId ? 'var(--fk-accent)' : 'var(--fk-text-sec)', fontWeight: 700, fontSize: 15,
-              fontFamily: '"M PLUS Rounded 1c", system-ui'
-            }}>{editingId ? 'かごから削除' : 'やめる'}</button>
-        </div>
-          }
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        {/* header */}
-        <div style={{ padding: '10px 22px 6px', flexShrink: 0 }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--fk-text)' }}>{copy.addTitle}</div>
-          <div style={{ fontSize: 13.5, color: 'var(--fk-text-sec)', marginTop: 3, fontWeight: 600 }}>
-            タイルを選ぶと登録画面へ。かごに溜めて、最後にまとめて登録。
-          </div>
-        </div>
-
-        {/* cart counter + expandable list (C) — shown from 0 items */}
-        <div style={{ flexShrink: 0, padding: '6px 18px 0' }}>
-            <button onClick={() => cart.length && setExpanded((e) => !e)} style={{
-            width: '100%', border: 'none', cursor: cart.length ? 'pointer' : 'default', borderRadius: 13,
-            background: 'var(--fk-brand-soft)', color: 'var(--fk-brand-ink)',
-            padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
-            fontFamily: '"M PLUS Rounded 1c", system-ui', fontSize: 13.5, fontWeight: 800
-          }}>
-              <FKLeaf size={15} /> かごに {cart.length}品
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: 'calc(13px + env(safe-area-inset-bottom))', background: 'var(--fk-surface2)', borderTop: '1px solid var(--fk-hair)', borderRadius: '18px 18px 0 0', boxShadow: '0 -3px 14px rgba(80,65,40,0.07)' }}>
               {cart.length > 0 &&
-            <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
-                {expanded ? '折りたたむ' : '一覧'}
-                <svg width="11" height="11" viewBox="0 0 12 12" style={{ transform: expanded ? 'rotate(-90deg)' : 'rotate(90deg)', transition: 'transform .2s' }}>
-                  <path d="M3 1l5 5-5 5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-            }
-              {cart.length === 0 &&
-            <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: 'var(--fk-brand-ink)', opacity: 0.6 }}>タイルを選んで追加</span>
-            }
-            </button>
-            {expanded &&
-          <div style={{ maxHeight: 168, overflowY: 'auto', marginTop: 7, display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {cart.map((it) => {
-              const c = window.FKD.fkCat(it.catId);
-              const u = window.FKT.fkUrgency(it.days, dark);
-              return (
-                <div key={it.id} onClick={() => openEdit(it)} style={{
-                  display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', cursor: 'pointer',
-                  background: 'var(--fk-surface)', borderRadius: 13
-                }}>
-                      <span style={{
-                    width: 26, height: 26, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 800, background: `color-mix(in oklab, ${c.color} 22%, transparent)`,
-                    color: `color-mix(in oklab, ${c.color} 78%, #4a3f2c)`
-                  }}>{c.glyph}</span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 700, color: 'var(--fk-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.name}</span>
-                      <span style={{
-                    fontSize: 12.5, fontWeight: 800, color: u.pillFg, background: u.pillBg,
-                    borderRadius: 999, padding: '3px 9px', flexShrink: 0
-                  }}>{it.days <= 0 ? '今日' : 'あと' + it.days + '日'}</span>
-                      <svg width="8" height="13" viewBox="0 0 8 14" style={{ flexShrink: 0, opacity: 0.5 }}>
-                        <path d="M1 1l6 6-6 6" stroke="var(--fk-text-ter)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <button onClick={(e) => {e.stopPropagation();removeRow(it.id);}} aria-label="取り消し" style={{
-                    width: 24, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', flexShrink: 0,
-                    background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(70,55,30,0.07)',
-                    color: 'var(--fk-text-sec)', fontSize: 11, lineHeight: 1,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>✕</button>
-                    </div>);
-
-            })}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px 10px' }}>
+                  <span style={{ fontSize: 16, flexShrink: 0, lineHeight: '24px' }}>🧺</span>
+                  <div className="fkChipTray" style={{ display: 'flex', alignItems: 'center', gap: 7, overflowX: 'auto', flex: 1, minWidth: 0, paddingTop: 5, paddingBottom: 5 }}>
+                    {grouped.map((g) => {const c = window.FKD.fkCat(g.catId);return (
+                      <span key={g.catId} style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', background: 'var(--fk-surface)', border: `1px solid ${c.color}55`, borderRadius: 999, padding: '4px 6px 4px 5px', boxShadow: '0 1px 2px rgba(80,65,40,0.10)', animation: 'fkChipIn .36s cubic-bezier(.25,.85,.3,1)' }}>
+                        <span key={g.count} style={{ minWidth: 17, height: 17, borderRadius: '50%', flexShrink: 0, background: c.color, color: '#fff', fontSize: 10.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', animation: 'fkPop .22s cubic-bezier(.3,1.3,.5,1)' }}>{g.count}</span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--fk-text)' }}>{c.name}</span>
+                        <span onClick={() => removeOneOfCat(g.catId)} style={{ width: 17, height: 17, borderRadius: '50%', background: 'rgba(70,55,30,0.08)', color: 'var(--fk-text-sec)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer', flexShrink: 0 }}>✕</span>
+                      </span>);})}
+                  </div>
+                </div>
+              }
+              <div style={{ padding: '0 18px' }}>
+                <button onClick={cart.length ? () => setScreen('confirm') : undefined} style={{
+                  width: '100%', border: 'none', cursor: cart.length ? 'pointer' : 'default', borderRadius: 16, padding: '15px 0',
+                  backgroundColor: cart.length ? accent : 'var(--fk-surface2)', color: cart.length ? '#fff' : 'var(--fk-text-ter)',
+                  fontWeight: 800, fontSize: 16, fontFamily: '"M PLUS Rounded 1c", system-ui',
+                  boxShadow: cart.length ? `0 6px 18px ${accent}59` : 'none', transition: 'color .15s ease'
+                }}>確認する{cart.length ? `（${cart.length}品）` : ''}</button>
               </div>
-          }
+            </div>
           </div>
 
-        {/* category grid — 種類ごとにセクション分け */}
-        <div style={{
-          padding: '2px 18px 18px', overflowY: 'auto', flex: 1, minHeight: 0
-        }}>
-          {(() => {
-            const grouped = new Set(FK_ADD_GROUPS.flatMap((g) => g.ids));
-            const extras = FKcats.filter((c) => !grouped.has(c.id)).map((c) => c.id);
-            const groups = extras.length ? [...FK_ADD_GROUPS, { key: 'other', label: 'その他', ids: extras }] : FK_ADD_GROUPS;
-            return groups.map((g) =>
-            <div key={g.key}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 2px 9px' }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--fk-brand-ink)', letterSpacing: 0.4 }}>{g.label}</span>
-                  <span style={{ flex: 1, height: 1, background: 'var(--fk-hair)' }} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 11 }}>
-                  {g.ids.map((id) => {const c = window.FKD.fkCat(id);return c ? <FKCatTile key={id} cat={c} dark={dark} addMode count={countOf(c.id)} onClick={() => openAdd(c)} /> : null;})}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+          {/* ── 確認・編集 ── */}
+          <div style={{ width: '50%', position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--fk-bg2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px 4px', flexShrink: 0 }}>
+              <span onClick={() => setScreen('select')} style={{ display: 'flex', alignItems: 'center', gap: 3, color: accent, fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>‹ 選び直す</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--fk-text)' }}>内容を確認</span>
+              <span style={{ width: 62 }} />
+            </div>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fk-text-sec)', padding: '0 20px 6px', flexShrink: 0 }}>名前・もち日数・残量を確認して追加できます。</div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 18px 104px' }}>
+              {screen === 'confirm' && sectionGroups.map((g) => {
+                const items = cart.filter((it) => g.ids.includes(it.catId));
+                if (!items.length) return null;
+                return (
+                  <div key={g.key}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 2px 9px' }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--fk-brand-ink)' }}>{g.label}</span>
+                      <span style={{ flex: 1, height: 1, background: 'var(--fk-hair)' }} />
+                    </div>
+                    {items.map((it) => <FKConfirmItem key={it.id} item={it} dark={dark} accent={accent} onChange={(n) => updateItem(it.id, n)} onRemove={() => {removeItem(it.id);if (cart.length <= 1) setScreen('select');}} />)}
+                  </div>);
+              })}
+              <button onClick={() => setScreen('select')} style={{ width: '100%', border: '1.5px dashed var(--fk-hair)', cursor: 'pointer', borderRadius: 14, padding: '12px 0', background: 'transparent', color: 'var(--fk-text-sec)', fontWeight: 800, fontSize: 13.5, fontFamily: '"M PLUS Rounded 1c", system-ui', marginTop: 6 }}>＋ 食べものを選び直す</button>
+            </div>
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 18px calc(13px + env(safe-area-inset-bottom))', background: 'var(--fk-surface2)', borderTop: '1px solid var(--fk-hair)', borderRadius: '18px 18px 0 0', boxShadow: '0 -3px 14px rgba(80,65,40,0.07)' }}>
+              <button onClick={commit} style={{ width: '100%', border: 'none', cursor: 'pointer', borderRadius: 16, padding: '15px 0', backgroundColor: accent, color: '#fff', fontWeight: 800, fontSize: 16, fontFamily: '"M PLUS Rounded 1c", system-ui', boxShadow: `0 6px 18px ${accent}59` }}>冷蔵庫に追加（{cart.length}品）</button>
+            </div>
+          </div>
 
-        {/* cart CTA bar (E) */}
-        <div style={{
-          flexShrink: 0, borderTop: '1px solid var(--fk-hair)', background: 'var(--fk-surface)',
-          padding: '11px 18px calc(13px + env(safe-area-inset-bottom))', display: 'flex', alignItems: 'center', gap: 12
-        }}>
-          <button onClick={() => cart.length && setExpanded((e) => !e)} disabled={!cart.length} style={{
-            display: 'flex', alignItems: 'center', gap: 8, fontSize: 14.5, fontWeight: 800, color: 'var(--fk-text)',
-            border: 'none', background: 'transparent', cursor: cart.length ? 'pointer' : 'default', padding: 0,
-            fontFamily: '"M PLUS Rounded 1c", system-ui'
-          }}>
-            <span style={{
-              minWidth: 25, height: 25, borderRadius: 999, padding: '0 6px', fontSize: 13, lineHeight: 1,
-              background: cart.length ? 'var(--fk-brand)' : 'var(--fk-surface2)',
-              color: cart.length ? '#fff' : 'var(--fk-text-ter)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>{cart.length}</span>
-            かごの中
-            {cart.length > 0 &&
-            <svg width="11" height="11" viewBox="0 0 12 12" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>
-              <path d="M1 8l5-5 5 5" stroke="var(--fk-text-sec)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            }
-          </button>
-          <button disabled={!cart.length} onClick={commit} style={{
-            marginLeft: 'auto', border: 'none', cursor: cart.length ? 'pointer' : 'default',
-            borderRadius: 13, padding: '11px 20px', fontSize: 15, fontWeight: 800,
-            fontFamily: '"M PLUS Rounded 1c", system-ui',
-            backgroundColor: cart.length ? accent : 'var(--fk-surface2)',
-            color: cart.length ? '#fff' : 'var(--fk-text-ter)',
-            boxShadow: cart.length ? `0 6px 18px ${accent}59` : 'none',
-            transition: 'color .15s ease'
-          }}>{cart.length ? 'まとめて登録' : 'カゴは空'}</button>
         </div>
       </div>
 
@@ -401,30 +328,17 @@ function FKAddSheet({ open, onClose, onAdd, onBatchDone, dark, tone, accent, cop
       {confirmClose &&
       <div style={{ position: 'absolute', inset: 0, zIndex: 10, display: 'flex', alignItems: 'flex-end' }}>
           <div onClick={() => setConfirmClose(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(20,14,6,0.28)', animation: 'fkScrimIn .22s ease' }} />
-          <div style={{
-          position: 'relative', width: '100%', background: 'var(--fk-bg2)', borderRadius: '22px 22px 0 0',
-          padding: '20px 22px calc(18px + env(safe-area-inset-bottom))', boxShadow: '0 -6px 26px rgba(20,14,6,0.22)',
-          animation: 'fkSheetPop .3s cubic-bezier(.22,.7,.3,1)'
-        }}>
+          <div style={{ position: 'relative', width: '100%', background: 'var(--fk-bg2)', borderRadius: '22px 22px 0 0', padding: '20px 22px calc(18px + env(safe-area-inset-bottom))', boxShadow: '0 -6px 26px rgba(20,14,6,0.22)', animation: 'fkSheetPop .3s cubic-bezier(.22,.7,.3,1)' }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--fk-text)' }}>かごに {cart.length}品 残っています</div>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--fk-text-sec)', marginTop: 4, lineHeight: 1.5 }}>
-              登録するとホームに追加されます。どうしますか？
-            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--fk-text-sec)', marginTop: 4, lineHeight: 1.5 }}>登録するとホームに追加されます。どうしますか？</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 16 }}>
-              <button onClick={commit} style={{
-              border: 'none', cursor: 'pointer', borderRadius: 14, padding: '14px 0', fontSize: 15.5, fontWeight: 800,
-              fontFamily: '"M PLUS Rounded 1c", system-ui', backgroundColor: accent, color: '#fff'
-            }}>{cart.length}品を登録して閉じる</button>
-              <button onClick={onClose} style={{
-              border: 'none', cursor: 'pointer', borderRadius: 14, padding: '12px 0', fontSize: 14.5, fontWeight: 700,
-              fontFamily: '"M PLUS Rounded 1c", system-ui', background: 'transparent', color: 'var(--fk-text-sec)'
-            }}>かごを空にして閉じる</button>
+              <button onClick={commit} style={{ border: 'none', cursor: 'pointer', borderRadius: 14, padding: '14px 0', fontSize: 15.5, fontWeight: 800, fontFamily: '"M PLUS Rounded 1c", system-ui', backgroundColor: accent, color: '#fff' }}>{cart.length}品を登録して閉じる</button>
+              <button onClick={onClose} style={{ border: 'none', cursor: 'pointer', borderRadius: 14, padding: '12px 0', fontSize: 14.5, fontWeight: 700, fontFamily: '"M PLUS Rounded 1c", system-ui', background: 'transparent', color: 'var(--fk-text-sec)' }}>かごを空にして閉じる</button>
             </div>
           </div>
         </div>
       }
     </FKSheet>);
-
 }
 
 // ── Onboarding : よく無駄にしがちな食材を3つだけ ──────────────────
