@@ -66,14 +66,18 @@ struct SheetContainer<Content: View>: View {
             ZStack(alignment: .bottom) {
                 if isPresented {
                     // スクリム
+                    // 注意: removal transition 中の重なり順は保証されないため zIndex を明示する。
+                    // 無いと閉じる瞬間にスクリムがパネルの上へ来て、一瞬暗転（ちらつき）する。
                     Self.scrim
                         .ignoresSafeArea()
                         .transition(.opacity)
                         .onTapGesture { requestDismiss() }
+                        .zIndex(0)
 
                     // パネル（下からスプリング・物理下端まで届く）
                     panel(geoHeight: geo.size.height, bottomInset: bottomInset)
                         .transition(.move(edge: .bottom))
+                        .zIndex(1)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)

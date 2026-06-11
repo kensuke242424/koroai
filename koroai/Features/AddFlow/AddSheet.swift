@@ -152,6 +152,12 @@ struct AddSheet: View {
             seedConfirmSample()
             model.confirmClose = true
         }
+        // 閉じアニメーションの録画検証用: 表示 1.5 秒後に自動で閉じる。
+        if args.contains("-autoCloseSheet") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                isPresented = false
+            }
+        }
     }
 
     /// スクショ用に 刺身×2・牛乳×1 を積む。
@@ -822,10 +828,13 @@ struct AddSheet: View {
         ZStack(alignment: .bottom) {
             if model.confirmClose {
                 let n = model.cartCount
+                // removal transition 中の重なり順を保証するため zIndex を明示
+                //（SheetContainer と同じちらつき対策）。
                 Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28)
                     .ignoresSafeArea()
                     .transition(.opacity)
                     .onTapGesture { model.confirmClose = false }
+                    .zIndex(0)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("かごに \(n)品 残っています")
                         .font(AppFont.rounded(size: 17, weight: .heavy))
@@ -876,6 +885,7 @@ struct AddSheet: View {
                     .ignoresSafeArea(edges: .bottom)
                 }
                 .transition(.move(edge: .bottom))
+                .zIndex(1)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
