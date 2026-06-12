@@ -13,6 +13,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct SettingsScreen: View {
     @Binding var isPresented: Bool
@@ -23,6 +24,7 @@ struct SettingsScreen: View {
     @Environment(AppStore.self) private var store
     @Environment(ToastCenter.self) private var toast
     @Environment(\.modelContext) private var context
+    @Environment(\.openURL) private var openURL
 
     @Query private var items: [FoodItem]
 
@@ -250,8 +252,7 @@ struct SettingsScreen: View {
                     icon: "envelope",
                     label: "フィードバックを送る"
                 ) {
-                    // TODO(Step 8): フィードバック導線（mailto など）。
-                    toast.show(.toss, "準備中です")
+                    sendFeedback()
                 }
                 // 情報行（タップ不可）。
                 SettingsInfoRow(
@@ -260,6 +261,23 @@ struct SettingsScreen: View {
                     sub: "ころあい v\(version)",
                     isLast: true
                 )
+            }
+        }
+    }
+
+    // MARK: - フィードバック
+
+    /// mailto でメールアプリを開く。開けない環境（メール未設定など）では
+    /// 宛先をコピーして責めないトーストで知らせる。
+    private func sendFeedback() {
+        guard let url = FeedbackMail.mailtoURL(
+            appVersion: version,
+            osVersion: UIDevice.current.systemVersion
+        ) else { return }
+        openURL(url) { accepted in
+            if !accepted {
+                UIPasteboard.general.string = FeedbackMail.address
+                toast.show(.ate, "メールが開けないため、宛先をコピーしました")
             }
         }
     }

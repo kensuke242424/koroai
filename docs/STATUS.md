@@ -28,8 +28,10 @@
   adjustableAction、スワイプ操作は accessibilityAction、装飾アイコンは hidden
 - **App Store 仕上げ**：PrivacyInfo.xcprivacy（収集なし・CA92.1 のみ）・
   ITSAppUsesNonExemptEncryption=NO・提出チェックリストは `docs/APP_STORE.md`
+- **フィードバック導線**：mailto で `koroai.dev@gmail.com`（ユーザー確定）。件名・診断行つき本文は
+  `Services/FeedbackMail.swift`（テスト対象）。メールが開けない環境は宛先コピー＋トーストにフォールバック
 
-テスト：**222件 / 32スイート green**（urgency・OKLCH 既知値・日付計算・分割・通知プランナー・追加フロー・カタログ整合性・カスタム既定値等）。
+テスト：**225件 / 33スイート green**（urgency・OKLCH 既知値・日付計算・分割・通知プランナー・追加フロー・カタログ整合性・カスタム既定値等）。
 
 ## 検証ハーネス
 
@@ -56,7 +58,6 @@ Dynamic Type の拡大検証は `xcrun simctl ui <UDID> content_size <large|extr
 ## 残課題・未決
 
 - **レシピボタン**＝「準備中」トースト（機能仕様が来たら実装。ユーザー決定）
-- **設定「フィードバックを送る」**＝準備中（方式は mailto に決定見込み・宛先アドレス待ち）
 - 通知の**実機での発火確認**は未実施（シミュレータ E2E は確認済み。実機接続時に `-digestAt` で同手順）
 - App Store 提出系の残り（プライバシーポリシー URL・スクショ・アイコン最終確認等）は `docs/APP_STORE.md` のチェックリスト
 
