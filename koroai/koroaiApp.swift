@@ -15,6 +15,7 @@ struct koroaiApp: App {
                     #if DEBUG
                     // スクショ時は権限ダイアログが UI に被るので抑止する（本番挙動には影響なし）。
                     if CommandLine.arguments.contains("-noNotifyPrompt") { return }
+                    applyNotifyDebugArgs()
                     #endif
                     await rescheduleNotifications()
                 }
@@ -61,6 +62,20 @@ struct koroaiApp: App {
     }
 
     #if DEBUG
+    /// 通知の実発火検証用フック。`-digestAt HH:mm` で朝のまとめ時刻を上書きし、
+    /// 数分後に実発火を観測できるようにする（例: -digestAt 12:45）。
+    @MainActor
+    private func applyNotifyDebugArgs() {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "-digestAt"), i + 1 < args.count else { return }
+        let parts = args[i + 1].split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2 else { return }
+        store.digestHour = parts[0]
+        store.digestMinute = parts[1]
+        store.notificationsEnabled = true
+        store.onboarded = true
+    }
+
     /// 空 DB のときだけシードを投入する（既存データは壊さない）。
     @MainActor
     private static func seedIfEmpty(_ container: ModelContainer) {

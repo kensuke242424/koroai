@@ -40,6 +40,12 @@ final class NotificationService {
         for p in planned {
             register(p)
         }
+        #if DEBUG
+        // 実発火検証・診断用（DEBUG のみ）。登録件数と直近の発火予定を残す。
+        NSLog("[Notify] scheduled %d notifications; first=%@",
+              planned.count,
+              planned.first.map { "\($0.id) @ \($0.fireDate)" } ?? "none")
+        #endif
     }
 
     /// うちのスケジューリングを全停止する（pending を全消し）。
