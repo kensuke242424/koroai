@@ -177,10 +177,12 @@ enum NotificationPlanner {
         return String(format: "digest-%04d%02d%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
-    /// まとめ通知のタイトル。出典: fk-digest.jsx FKLockScreen title。
-    /// simple は lead のみ、それ以外は「おはようございます。{lead}」。
+    /// まとめ通知のタイトル。全トーン lead のみ（ユーザー決定 2026-06-12）。
+    /// ロック画面のタイトルは全角18字程度で切れるため、「おはようございます。」を前置すると
+    /// 肝心の情報（今日/あす・品数）が見切れる。挨拶はアプリ内のまとめ画面にだけ残す。
+    /// （fk-digest.jsx FKLockScreen の「おはようございます。{lead}」から通知のみ変更）
     static func digestTitle(lead: String, tone: Tone) -> String {
-        tone == .simple ? lead : "おはようございます。\(lead)"
+        lead
     }
 
     /// まとめ通知の本文。出典: fk-digest.jsx FKLockScreen 本文。

@@ -156,22 +156,22 @@ struct NotificationPlannerTests {
         }
     }
 
-    @Test func digestTitleGentlePrefixesGreeting() {
+    @Test func digestTitleGentleIsLeadOnly() {
         // 6/11 の朝: daysLeft 6 の食材は 6/11 時点で残5 → soon ではないので urgent でない…
         // urgent を確実にするため、6/11 朝に「あと2日（soon）」になる食材を置く（期限 6/13）。
         let planned = NotificationPlanner.plan(items: [item("刺身", daysLeft: 3)], settings: settings(digestHour: 8, tone: .gentle), now: now(), calendar: cal())
         let digests = digestNotifications(planned).sorted { $0.fireDate < $1.fireDate }
         let first = digests.first
         // 6/11 朝、期限 6/13 → 残2日 → soon。lead = 「近いうちに食べたいものが 1品」。
+        // タイトルは全トーン lead のみ（ユーザー決定 2026-06-12。挨拶前置はロック画面で見切れるため廃止）。
         #expect(first?.fireDate == at(2026, 6, 11, 8, 0))
-        #expect(first?.title == "おはようございます。近いうちに食べたいものが 1品")
+        #expect(first?.title == "近いうちに食べたいものが 1品")
     }
 
-    @Test func digestTitleSimpleHasNoGreetingPrefix() {
+    @Test func digestTitleSimpleIsLeadOnly() {
         let planned = NotificationPlanner.plan(items: [item("刺身", daysLeft: 3)], settings: settings(digestHour: 8, tone: .simple), now: now(), calendar: cal())
         let first = digestNotifications(planned).sorted { $0.fireDate < $1.fireDate }.first
-        // simple は lead のみ（「近いうちに…」ではなく simple soon は cheer/gentle 共通の文言だが、
-        //  simple の soon lead は "近いうちに食べたいものが 1品"。title は接頭辞なしでそれ。）
+        // simple も lead のみ（simple の soon lead は "近いうちに食べたいものが 1品"）。
         #expect(first?.title == "近いうちに食べたいものが 1品")
     }
 
