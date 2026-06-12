@@ -35,6 +35,8 @@ struct ContentView: View {
                 // ふりかえり等の push 遷移用に NavigationStack を張る（ホーム自身はナビバー非表示）。
                 NavigationStack {
                     HomeView(onReplayGuide: { guideReplay = true })
+                        // ナビバー非表示でもエッジスワイプで戻れるようにする（push 全画面に効く）。
+                        .background(EdgeSwipeBackEnabler())
                 }
             }
         }
