@@ -252,6 +252,10 @@ struct AddSheet: View {
 
     // ヘッダー（タイトル＋説明 ≈70pt）が隠れきるあたりでインラインタイトルを入れる。
     private var inlineTitleProgress: CGFloat { clamp01((selectScrollY - 56) / 22) }
+    /// 選ぶ画面でスクロール値を使う演出の終端（inlineTitleProgress が 1 になる 56+22pt の少し先）。
+    private static let selectScrollCap: CGFloat = 80
+    /// 確認画面は contentAtTop（<=1）判定にしか使わないので、ごく浅い cap で更新を止める。
+    private static let confirmScrollCap: CGFloat = 2
 
     /// インラインタイトル。ハンドル領域（高さ28・SheetContainer）まで背景を伸ばして
     /// シート上端と一体の1枚のヘッダーに見せる（ハンドルは同位置に描き直す）。
@@ -336,10 +340,13 @@ struct AddSheet: View {
             .onPreferenceChange(ScrollOffsetKey.self) { y in
                 // iOS 17 用フォールバック。iOS 18+ は onScrollGeometryChange（下の modifier）で取得する。
                 if #unavailable(iOS 18.0) {
-                    if abs(selectScrollY - y) > 1 { selectScrollY = y }
+                    let q = ScrollOffsetObserver.quantize(y, cap: Self.selectScrollCap)
+                    if selectScrollY != q { selectScrollY = q }
                 }
             }
-            .modifier(ScrollOffsetObserver(scrollY: $selectScrollY))
+            // インラインタイトルの演出は 78pt で終わる。それより深くは値を使わないので
+            // cap で状態更新を止める（深いスクロール中の全面再評価＝カクつき対策）。
+            .modifier(ScrollOffsetObserver(scrollY: $selectScrollY, cap: Self.selectScrollCap))
             // インラインタイトルタップで最上部へ（タップ受けは selectScreen の overlay 側）。
             .onChange(of: scrollToTopRequest) { _, _ in
                 withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
@@ -781,10 +788,11 @@ struct AddSheet: View {
         .scrollDisabled(detent == .medium || sheetDragging)
         .onPreferenceChange(ScrollOffsetKey.self) { y in
             if #unavailable(iOS 18.0) {
-                if abs(confirmScrollY - y) > 1 { confirmScrollY = y }
+                let q = ScrollOffsetObserver.quantize(y, cap: Self.confirmScrollCap)
+                if confirmScrollY != q { confirmScrollY = q }
             }
         }
-        .modifier(ScrollOffsetObserver(scrollY: $confirmScrollY))
+        .modifier(ScrollOffsetObserver(scrollY: $confirmScrollY, cap: Self.confirmScrollCap))
         .frame(maxHeight: .infinity)
     }
 

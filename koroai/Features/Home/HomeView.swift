@@ -67,6 +67,9 @@ struct HomeView: View {
     private var kickerProgress: CGFloat { clamp01(scrollY / 24) }
     // 小タイトルは大タイトルが隠れた（titleProgress でほぼ消えた）タイミングで入れ替わる（ユーザー指定）。
     private var compactTitleProgress: CGFloat { clamp01((scrollY - 52) / 26) }
+    /// スクロール値を使う演出の終端（compactTitleProgress 52+26pt と hairline 64pt の少し先）。
+    /// これより深い位置では状態更新を止める（スクロール中の全面再評価＝カクつき対策）。
+    private static let scrollCap: CGFloat = 80
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -399,10 +402,11 @@ struct HomeView: View {
         .onPreferenceChange(ScrollOffsetKey.self) { y in
             // iOS 17 用フォールバック。iOS 18+ は onScrollGeometryChange（下の modifier）で取得する。
             if #unavailable(iOS 18.0) {
-                if abs(scrollY - y) > 1 { scrollY = y }
+                let q = ScrollOffsetObserver.quantize(y, cap: Self.scrollCap)
+                if scrollY != q { scrollY = q }
             }
         }
-        .modifier(ScrollOffsetObserver(scrollY: $scrollY))
+        .modifier(ScrollOffsetObserver(scrollY: $scrollY, cap: Self.scrollCap))
     }
 
     // ScrollView 内で sticky にするため LazyVStack(pinnedViews) を使う構成へ。
