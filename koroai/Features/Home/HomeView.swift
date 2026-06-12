@@ -535,6 +535,9 @@ struct HomeView: View {
             )
         }
         .buttonStyle(.plain)
+        // 達成カード（大数字「N品」＋ほめコメント）は AX サイズで数字分断・文言崩れが起きるため
+        // xxxLarge でキャップする（拡大時のみ効く。large の見た目は不変）。
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     /// ほめコメント＋文末インラインの葉っぱ（テキストと一緒に折り返す）。

@@ -193,6 +193,9 @@ struct HeroCard: View {
                 EatBurst()
             }
         }
+        // ヒーローカードは AX サイズで文言切れ・FAB 被りが起きるため xxxLarge でキャップする
+        //（拡大時のみ効く。large の見た目は不変）。
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private var neutralBg: Color {

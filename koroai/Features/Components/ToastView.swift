@@ -64,10 +64,12 @@ struct ToastOverlay: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 20))
                     .foregroundStyle(.white)
+                    .accessibilityHidden(true)
             } else {
                 Image(systemName: "trash")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(tokens.textSec)
+                    .accessibilityHidden(true)
             }
             Text(toast.text)
                 .font(AppFont.rounded(size: 15, weight: .bold))

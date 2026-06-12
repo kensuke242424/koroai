@@ -54,6 +54,9 @@ struct SwipeableRow<Content: View>: View {
         .frame(height: collapsed ? 0 : nil)
         .opacity(gone == nil ? 1 : 0)
         .animation(.easeInOut(duration: 0.32), value: collapsed)
+        // VoiceOver: スワイプでしか出ない操作をローター/アクションから使えるようにする。
+        .accessibilityAction(named: Text("食べた")) { onAte?() }
+        .accessibilityAction(named: Text("そっと処分")) { onToss?() }
     }
 
     // MARK: - リビール背景（左右）
@@ -86,6 +89,7 @@ struct SwipeableRow<Content: View>: View {
             .labelStyle(.trailingIcon)
             .foregroundStyle(tokens.textSec)
             .opacity(!showAte && dx < -8 ? Double(reveal) : 0)
+            .accessibilityLabel("そっと処分")
         }
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

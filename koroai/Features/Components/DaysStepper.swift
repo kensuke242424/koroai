@@ -20,6 +20,20 @@ struct DaysStepper: View {
                 .frame(minWidth: 92)
             button("+") { days += 1 }
         }
+        // 合成表示（「あと」＋数字＋「日」＋−/＋ボタン）は AX サイズで重なって崩れるため
+        // xxxLarge でキャップする（拡大時のみ効く。large の見た目は不変）。
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        // VoiceOver: ステッパー全体を1要素にまとめ、調整アクションで増減する（過去日不可は本体ロジックに従う）。
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("もち日数")
+        .accessibilityValue(days <= 0 ? "今日" : "あと\(days)日")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: days += 1
+            case .decrement: days = max(0, days - 1)
+            @unknown default: break
+            }
+        }
     }
 
     private func button(_ glyph: String, action: @escaping () -> Void) -> some View {

@@ -21,5 +21,7 @@ struct AppMark: View {
                 in: RoundedRectangle(cornerRadius: radius ?? size * 0.28, style: .continuous)
             )
             .shadow(color: .black.opacity(0.18), radius: 1.5, x: 0, y: 1)
+            // 装飾（アプリマーク）なので VoiceOver から隠す。
+            .accessibilityHidden(true)
     }
 }

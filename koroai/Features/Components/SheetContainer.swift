@@ -157,6 +157,7 @@ struct SheetContainer<Content: View>: View {
                 }
             }
             .gesture(detentDragGesture(geoHeight: geoHeight))
+            .modifier(HandleAccessibility(detent: detent))
     }
 
     private func detentDragGesture(geoHeight: CGFloat) -> some Gesture {
@@ -251,6 +252,34 @@ struct SheetContainer<Content: View>: View {
             onDismissRequest()
         } else {
             isPresented = false
+        }
+    }
+}
+
+// MARK: - ハンドルのアクセシビリティ
+
+/// detent を持つシートのハンドルは「シートの高さ」を調整できる要素にし、
+/// detent を持たないシートのハンドルは純粋装飾として VoiceOver から隠す。
+private struct HandleAccessibility: ViewModifier {
+    let detent: Binding<SheetDetent>?
+
+    func body(content: Content) -> some View {
+        if let detent {
+            content
+                .accessibilityElement()
+                .accessibilityLabel("シートの高さ")
+                .accessibilityValue(detent.wrappedValue == .large ? "大サイズ" : "中サイズ")
+                .accessibilityAdjustableAction { direction in
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                        switch direction {
+                        case .increment: detent.wrappedValue = .large
+                        case .decrement: detent.wrappedValue = .medium
+                        @unknown default: break
+                        }
+                    }
+                }
+        } else {
+            content.accessibilityHidden(true)
         }
     }
 }

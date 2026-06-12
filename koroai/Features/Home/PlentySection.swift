@@ -59,6 +59,8 @@ struct PlentySection: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(tokens.textTer)
                     .rotationEffect(.degrees(open ? 90 : 0))
+                    // 折りたたみの向きを示す装飾。状態はボタンのラベルで伝えるので隠す。
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 4)
             .padding(.top, 4)
@@ -67,6 +69,8 @@ struct PlentySection: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // 開閉トグルであることを VoiceOver に伝える（open 状態で出し分け）。
+        .accessibilityLabel(open ? "ゆとりありを隠す" : "ゆとりありを表示")
     }
 
     // 件数バッジ背景。出典: fk-home.jsx FKPlenty rgba(70,55,30,0.06) / dark rgba(255,255,255,0.06)

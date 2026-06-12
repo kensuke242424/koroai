@@ -40,5 +40,8 @@ struct CategoryIcon: View {
             .frame(width: size, height: size)
             .background(bg, in: Circle())
             .overlay(Circle().strokeBorder(ring, lineWidth: 1.5))
+            // 漢字1字グリフだけでは意味が伝わりにくいため、カテゴリ名を読み上げる。
+            .accessibilityElement()
+            .accessibilityLabel(category.name)
     }
 }

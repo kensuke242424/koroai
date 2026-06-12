@@ -687,6 +687,9 @@ struct AddSheet: View {
         .padding(.horizontal, 14)
         .padding(.top, 8)
         .padding(.bottom, 4)
+        // 3要素が横並びのトップバーは AX サイズで重なるため xxxLarge でキャップする
+        //（拡大時のみ効く。large の見た目は不変）。
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     /// 確認画面の「残量」表示トグル。on＝accent 14%地＋accent文字／off＝中立背景＋textSec

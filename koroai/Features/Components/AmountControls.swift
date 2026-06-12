@@ -145,6 +145,21 @@ struct AmountSlider: View {
             )
         }
         .frame(height: 30)
+        // VoiceOver: 吸着スライダーを1要素にまとめ、現在の停止点ラベルを読み上げ、
+        // 調整アクションで隣の停止点へ移動する（タップ/ドラッグと同じ frac 代入経路）。
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("残量")
+        .accessibilityValue(current.label)
+        .accessibilityAdjustableAction { direction in
+            guard let i = AmountStops.all.firstIndex(where: { $0.label == current.label }) else { return }
+            switch direction {
+            case .increment:
+                if i + 1 < AmountStops.all.count { frac = AmountStops.all[i + 1].frac }
+            case .decrement:
+                if i - 1 >= 0 { frac = AmountStops.all[i - 1].frac }
+            @unknown default: break
+            }
+        }
     }
 
     private var labelRow: some View {
@@ -268,6 +283,8 @@ struct AmountCount: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // 記号グリフ（−／＋）は VoiceOver では読み上げにくいので明示ラベルを付ける。
+        .accessibilityLabel(glyph == "−" ? "減らす" : "増やす")
     }
 
     private var diffRow: some View {

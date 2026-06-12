@@ -59,6 +59,8 @@ struct EmptyFridgeView: View {
                     .font(AppFont.rounded(size: 12.5, weight: .bold))
                 Image(systemName: "arrow.down")
                     .font(.system(size: 14, weight: .semibold))
+                    // 隣のテキストで意味が伝わる装飾アイコン。
+                    .accessibilityHidden(true)
             }
             .foregroundStyle(tokens.textTer)
             .padding(.top, 30)
@@ -74,5 +76,7 @@ struct EmptyFridgeView: View {
             .foregroundStyle(tokens.brand.opacity(0.7))
             .frame(width: 96, height: 96)
             .background(tokens.brandSoft, in: Circle())
+            // タイトル・サブで意味が伝わる装飾アイコン。
+            .accessibilityHidden(true)
     }
 }

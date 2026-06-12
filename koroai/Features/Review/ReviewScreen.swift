@@ -124,6 +124,9 @@ struct ReviewScreen: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(tokens.hair, lineWidth: 1)
         )
+        // ヒーローの大数字（「N品 食べきり」）は AX サイズで数字が分断されるため
+        // xxxLarge でキャップする（拡大時のみ効く。large の見た目は不変）。
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     /// brandSoft → surface の 160° グラデ。

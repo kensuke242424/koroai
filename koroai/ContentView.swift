@@ -40,6 +40,9 @@ struct ContentView: View {
                 }
             }
         }
+        // Dynamic Type のグローバル上限。AX2 までスケールし、それ以上はキャップする
+        //（合成表示コンポーネントはさらに個別に xxxLarge でキャップする）。
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .environment(\.tokens, tokens)
         .environment(\.resolvedTheme, resolvedTheme)
         .environment(toastCenter)

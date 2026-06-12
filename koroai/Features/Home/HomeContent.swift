@@ -111,6 +111,8 @@ struct NoUrgentCard: View {
                 .foregroundStyle(tokens.brand)
                 .frame(width: 46, height: 46)
                 .background(tokens.surface, in: Circle())
+                // 隣のテキストで意味が伝わる装飾アイコン。
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(HomeCopy.noUrgentTitle)
@@ -141,6 +143,8 @@ struct NoUrgentEmpty: View {
                 .foregroundStyle(tokens.brand)
                 .frame(width: 56, height: 56)
                 .background(tokens.brandSoft, in: Circle())
+                // 隣のテキストで意味が伝わる装飾アイコン。
+                .accessibilityHidden(true)
             Text(store.tone.copy.empty)
                 .font(AppFont.rounded(size: 15.5, weight: .bold))
                 .foregroundStyle(tokens.textSec)
