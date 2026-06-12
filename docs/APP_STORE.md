@@ -19,10 +19,10 @@
 - [ ] App アイコン（マーケティング用 1024px 含む）の最終確認
 - [ ] スクリーンショット（6.9" / 6.5" 必須サイズ）
 - [ ] サポート URL・マーケティング URL
-- [ ] 設定「フィードバックを送る」の宛先確定（アプリ内実装と合わせる）
+- [x] 設定「フィードバックを送る」の宛先確定（mailto: koroai.dev@gmail.com）
 - [ ] 通知の実機発火確認（シミュレータでは確認済み → STATUS.md）
-- [ ] Dynamic Type / アクセシビリティ対応
-- [ ] 暗号化輸出コンプライアンス: 独自暗号なし → `ITSAppUsesNonExemptEncryption = NO` を Info.plist に追加予定
+- [x] Dynamic Type / アクセシビリティ対応（AX2 キャップ＋VoiceOver 対応済み）
+- [x] 暗号化輸出コンプライアンス: `ITSAppUsesNonExemptEncryption = NO` 設定済み
 
 ## 審査観点のメモ
 
