@@ -107,15 +107,18 @@ struct SheetContainer<Content: View>: View {
         // 非 detent シートは従来どおり 88% 上限の内容フィット。
         .frame(maxHeight: detentFractions != nil ? (height ?? geoHeight * 0.88) : geoHeight * 0.88, alignment: .top)
         .background(
-            tokens.bg2,
-            in: UnevenRoundedRectangle(
+            // 影は「スクロールで毎フレーム変わる中身の合成」ではなく静的な背景形状に付ける。
+            // パネル全体（content 込み）に .shadow を掛けると、スクロール中ずっと
+            // ほぼ全画面のシルエット再計算＋半径20のぼかしが GPU で走ってフレーム落ちする（実機で確認）。
+            UnevenRoundedRectangle(
                 topLeadingRadius: 28, bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0, topTrailingRadius: 28,
                 style: .continuous
             )
+            .fill(tokens.bg2)
+            .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
+                    radius: 20, x: 0, y: -8)
         )
-        .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
-                radius: 20, x: 0, y: -8)
         // 先勝ちの detent ドラッグ。detentFractions が無いシート（EditSheet 等）には
         // GestureMask .none で完全に無効化する（onChanged 側でも detent nil をガード）。
         .simultaneousGesture(
