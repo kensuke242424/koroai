@@ -42,6 +42,10 @@ struct SheetContainer<Content: View>: View {
     /// コンテンツのスクロールが最上部にあるか（large 時の下スワイプ係合判定に使う）。
     /// nil なら large からのパネルドラッグは係合しない（従来挙動）。
     var contentAtTop: (() -> Bool)? = nil
+    /// medium detent からの下スワイプ（破棄ジェスチャ）を検知したときの通知。指定時のみ有効化。
+    /// 親が状況（かごの中身など）を見て「実際に閉じる／確認を出して留まる」を判断する。
+    /// 指定すると、medium での下方向ドラッグが指によく追従するようになる（閉じられる手触り）。
+    var onSwipeDownDismiss: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
 
     @Environment(\.tokens) private var tokens
@@ -57,6 +61,12 @@ struct SheetContainer<Content: View>: View {
 
     // 出典: fk-ui.jsx FKSheet スクリム rgba(20,14,6,0.34)。
     private static var scrim: Color { Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.34) }
+
+    // 破棄ジェスチャ（medium からの下スワイプ）の閾値。raw な指の移動量で判定する。
+    // （ジェネリック型のため static stored property は不可。computed で持つ。）
+    private static var dismissDistance: CGFloat { 96 }       // この距離を超えれば速度に関係なく破棄要求
+    private static var dismissFlickDistance: CGFloat { 28 }  // フリック判定の最小距離
+    private static var dismissFlickVelocity: CGFloat { 650 } // 下向きフリックとみなす速度(pt/s)
 
     var body: some View {
         GeometryReader { geo in
@@ -139,7 +149,12 @@ struct SheetContainer<Content: View>: View {
             var h = base + dragDelta
             // 範囲外はラバーバンド（下 0.35 / 上 0.15）。上はステータスバーに食い込まないよう geo 高さでハードクランプ。
             if h > maxH { h = min(maxH + (h - maxH) * 0.15, geoHeight) }
-            if h < minH { h = minH - (minH - h) * 0.35 }
+            if h < minH {
+                // 破棄可能（onSwipeDownDismiss あり）かつ medium のときは、下方向に指へよく追従させて
+                // 「下スワイプで閉じられる」ことを手触りで伝える。それ以外は従来どおり固めのラバーバンド。
+                let follow: CGFloat = (onSwipeDownDismiss != nil && current == .medium) ? 0.92 : 0.35
+                h = minH - (minH - h) * follow
+            }
             return h
         }
         return heightFraction.map { geoHeight * $0 }
@@ -174,13 +189,38 @@ struct SheetContainer<Content: View>: View {
                 applyDetentDrag(translationY: value.translation.height)
             }
             .onEnded { value in
-                snapDetent(geoHeight: geoHeight, translationY: value.translation.height)
+                endDrag(geoHeight: geoHeight,
+                        translationY: value.translation.height,
+                        velocityY: value.velocity.height)
             }
     }
 
     /// ドラッグ量→高さ補正。上ドラッグ（負の translation）で高さが増える。
     private func applyDetentDrag(translationY: CGFloat) {
         dragDelta = -translationY
+    }
+
+    /// ドラッグ終了の共通処理。medium からの下スワイプが破棄閾値を超えたら破棄要求、
+    /// それ以外は近い detent へスナップする（ハンドル／パネル両方のドラッグから呼ぶ）。
+    private func endDrag(geoHeight: CGFloat, translationY: CGFloat, velocityY: CGFloat) {
+        if onSwipeDownDismiss != nil,
+           let detent, detent.wrappedValue == .medium,
+           isSwipeDownDismiss(translationY: translationY, velocityY: velocityY) {
+            // 見た目は medium へ戻す（非空で確認を出すケースの土台＝そのまま留まる）。
+            // かご空のケースは親が isPresented=false にするので、退場アニメが優先される。
+            withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                dragDelta = 0
+            }
+            onSwipeDownDismiss?()
+            return
+        }
+        snapDetent(geoHeight: geoHeight, translationY: translationY)
+    }
+
+    /// medium からの下スワイプを破棄ジェスチャとみなすか。距離が大きい or 下向きフリック。
+    private func isSwipeDownDismiss(translationY: CGFloat, velocityY: CGFloat) -> Bool {
+        if translationY > Self.dismissDistance { return true }
+        return translationY > Self.dismissFlickDistance && velocityY > Self.dismissFlickVelocity
     }
 
     /// 離した位置→近い detent へスナップ。dragDelta は 0 へ戻す。
@@ -240,7 +280,9 @@ struct SheetContainer<Content: View>: View {
                 let engaged = panelDragEngaged == true
                 panelDragEngaged = nil
                 guard engaged else { return }
-                snapDetent(geoHeight: geoHeight, translationY: value.translation.height)
+                endDrag(geoHeight: geoHeight,
+                        translationY: value.translation.height,
+                        velocityY: value.velocity.height)
                 // タップ抑止は離した直後のタップ判定が流れ込むまで少し残す。
                 suppressGeneration += 1
                 let generation = suppressGeneration

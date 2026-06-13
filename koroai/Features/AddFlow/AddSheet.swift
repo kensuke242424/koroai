@@ -41,7 +41,10 @@ struct AddSheet: View {
                 onDismissRequest: { handleDismiss() },
                 detentDragActive: $sheetDragging,
                 // large 時の下スワイプ先勝ち判定（表示中画面のスクロールが最上部か）。
-                contentAtTop: { model.screen == .select ? selectScrollY <= 1 : confirmScrollY <= 1 }
+                contentAtTop: { model.screen == .select ? selectScrollY <= 1 : confirmScrollY <= 1 },
+                // medium からの下スワイプ破棄。かご空→そのまま閉じる／非空→「かごに N品 残っています」確認
+                //（スクリムタップと同じ handleDismiss 経由でかご基準に判断）。
+                onSwipeDownDismiss: { handleDismiss() }
             ) {
                 track
             }
