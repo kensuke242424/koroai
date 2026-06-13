@@ -116,7 +116,9 @@ struct SheetContainer<Content: View>: View {
                 style: .continuous
             )
             .fill(tokens.bg2)
-            .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.28),
+            // opacity はユーザー調整 0.28→0.40（2026-06-13「やや強めに」）。
+            // 静的シェイプ側の影なので強めてもスクロール性能への影響はない。
+            .shadow(color: Color(.sRGB, red: 20 / 255, green: 14 / 255, blue: 6 / 255, opacity: 0.40),
                     radius: 20, x: 0, y: -8)
         )
         // 先勝ちの detent ドラッグ。detentFractions が無いシート（EditSheet 等）には
