@@ -60,6 +60,7 @@ struct HomeView: View {
 
     private var split: HomeSplit { HomeSplitter.split(items: items) }
     private var monthlyAte: Int { Stats.monthlyAteCount(logs: logs) }
+    private var lifetimeAte: Int { Stats.lifetimeAteCount(logs: logs) }
 
     // 大タイトルのフェード進行: clamp((y-26)/34)。出典: fk-app.jsx titleP。
     private var titleProgress: CGFloat { clamp01((scrollY - 26) / 34) }
@@ -413,16 +414,18 @@ struct HomeView: View {
     @ViewBuilder
     private var contentArea: some View {
         VStack(spacing: 0) {
-            if items.isEmpty {
-                EmptyFridgeView(tone: store.tone) { openAdd() }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 14)
-            } else {
-                VStack(spacing: 0) {
-                    if store.showAchievementCard && split.hasHero {
-                        achievementCard
-                            .padding(.bottom, 16)
-                    }
+            VStack(spacing: 0) {
+                // 達成カード（→ ふりかえり）は在庫の有無・中身に依らず常に上部へ出す。
+                // 以前は hasHero（食べ頃が近い食材がある）を条件にしていたため、全部「ゆとりあり」や
+                // 空冷蔵庫のときに食べきり記録への動線が消えていた。記録は在庫に依らず意味がある。
+                // ただし食べきり履歴ゼロ（新規）では「0品 + 称賛」が空虚なうえ、ふりかえりも空なので出さない。
+                if store.showAchievementCard && lifetimeAte > 0 {
+                    achievementCard
+                        .padding(.bottom, 16)
+                }
+                if items.isEmpty {
+                    EmptyFridgeView(tone: store.tone) { openAdd() }
+                } else {
                     HomeContent(
                         split: split,
                         onAte: ate(_:),
@@ -433,14 +436,13 @@ struct HomeView: View {
                             } else {
                                 openEdit(item)
                             }
-                        },
-                        onRecipe: { toast.show(.toss, "準備中です") } // ユーザー決定: レシピは準備中
+                        }
                     )
                     .id("homeScrollTarget") // -scrollHome 検証フックのスクロール先
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
 
             // FAB に被らないための余白
             Color.clear.frame(height: 130)

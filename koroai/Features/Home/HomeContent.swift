@@ -1,6 +1,7 @@
 // 案C ホーム本体。プロトタイプ fk-home.jsx FKHomeC の構成を移植。
 //
-// urgent があれば HeroCard、なければ「急ぎなし」カード（hero はあるが urgent が空）。
+// urgent があれば「きょうの食べ頃」ボックス（UrgentSection・一覧性優先のリスト表示）、
+// なければ「急ぎなし」カード（hero はあるが urgent が空）。
 // hero 全体が0件なら FKEmpty 相当。calm があれば「今週の食材」リスト。最後に PlentySection。
 
 import SwiftUI
@@ -10,7 +11,6 @@ struct HomeContent: View {
     var onAte: (FoodItem) -> Void
     var onToss: (FoodItem) -> Void
     var onEdit: (FoodItem) -> Void
-    var onRecipe: () -> Void
 
     @Environment(\.tokens) private var tokens
 
@@ -20,12 +20,12 @@ struct HomeContent: View {
                 // hero（生鮮で食べ頃近い）が0件 → FKEmpty 相当
                 NoUrgentEmpty()
             } else if !split.urgent.isEmpty {
-                HeroCard(
+                // 急ぎの食材は「きょうの食べ頃」ボックスでリスト表示（全件が見える一覧性を優先）。
+                UrgentSection(
                     urgent: split.urgent,
                     onAte: onAte,
                     onToss: onToss,
-                    onEdit: onEdit,
-                    onRecipe: onRecipe
+                    onEdit: onEdit
                 )
             } else {
                 NoUrgentCard()
@@ -99,6 +99,66 @@ struct ItemRow: View {
     }
 }
 
+// MARK: - きょうの食べ頃（急ぎの食材を一覧で見せる）
+
+/// 急ぎの食材（urgent）を 今週の食材 と同じリストUIで見せる（幅・コンテナ・区切り線を統一）。
+/// ヒーローカード（1品ずつ・背後が隠れる）と違い、全件リストで一覧性を保つ。
+/// 違いは見出しのみ（アラーム＋件数で急ぎを示す）。行は ItemRow / SwipeableRow。
+struct UrgentSection: View {
+    let urgent: [FoodItem]
+    var onAte: (FoodItem) -> Void
+    var onToss: (FoodItem) -> Void
+    var onEdit: (FoodItem) -> Void
+
+    @Environment(\.tokens) private var tokens
+    @Environment(\.resolvedTheme) private var theme
+
+    /// 最も急ぎの残日数で見出しの色温度を決める（urgency は残日数→色の純粋関数・赤は使わない）。
+    private var leadDays: Int { urgent.map { $0.daysLeft() }.min() ?? 0 }
+    private var u: UrgencyColors { Urgency.colors(daysLeft: leadDays, isDark: theme.isDark) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // 見出し（今週の食材と同じ位置・サイズ感。アラームと件数で急ぎを示す）。
+            HStack(spacing: 6) {
+                Image(systemName: "alarm.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(u.solid)
+                    .accessibilityHidden(true)
+                Text("きょうの食べ頃")
+                    .font(AppFont.rounded(size: 15, weight: .bold))
+                    .foregroundStyle(tokens.text)
+                Spacer(minLength: 0)
+                Text("\(urgent.count)品")
+                    .font(AppFont.rounded(size: 13, weight: .bold))
+                    .foregroundStyle(u.pillFg)
+            }
+            .padding(.horizontal, 2)
+
+            // リスト（今週の食材と同一スタイル: surface 角丸＋区切り線＋アイコン38）。
+            VStack(spacing: 0) {
+                ForEach(Array(urgent.enumerated()), id: \.element.id) { index, item in
+                    SwipeableRow(
+                        onAte: { onAte(item) },
+                        onToss: { onToss(item) },
+                        onTap: { onEdit(item) }
+                    ) {
+                        ItemRow(item: item, iconSize: 38)
+                            .overlay(alignment: .top) {
+                                if index > 0 {
+                                    Rectangle().fill(tokens.hair).frame(height: 1)
+                                }
+                            }
+                    }
+                }
+            }
+            .background(tokens.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadow(color: tokens.shadow, radius: 2, x: 0, y: 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 // MARK: - 急ぎなしカード（hero あり / urgent なし）
 
 struct NoUrgentCard: View {
@@ -127,6 +187,12 @@ struct NoUrgentCard: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 20)
         .background(tokens.brandSoft, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        // ライトモードで brandSoft が背景に溶けて輪郭が見えないため、縁取り＋柔シャドウで持ち上げる。
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(mixOKLab(tokens.brand, tokens.brandSoft, fractionOfFirst: 0.28), lineWidth: 1)
+        )
+        .shadow(color: tokens.shadow, radius: 5, x: 0, y: 2)
     }
 }
 
