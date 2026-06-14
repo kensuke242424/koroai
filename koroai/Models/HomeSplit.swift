@@ -3,8 +3,9 @@
 // fkSplit: hero = perishable && daysLeft<=6 / plenty = それ以外。
 //   非生鮮（perishable=false）は daysLeft が小さくても plenty 行き（プロトタイプ仕様）。
 //   hero は daysLeft 昇順 → purchasedAt 昇順。plenty は daysLeft 昇順。
-// FKHomeC: hero のうち daysLeft<=2 を urgent（ヒーローデッキ）、daysLeft>2 を calm（今週の食材）。
-//   calm は daysLeft 昇順で並べ直す（fkSplit 由来の hero 並びと同値だが、仕様の明示に従い再ソート）。
+// hero のうち daysLeft<=0（期限が今日まで・期限切れ含む）を urgent（きょうの食べ頃）、
+//   daysLeft>0 を calm（今週の食材）。calm は daysLeft 昇順で並べ直す。
+//   ※旧仕様は urgent=daysLeft<=2。ユーザー指定（2026-06）で「今日まで」に変更。
 //
 // 残日数は保存しないため、分割のたびに now/calendar から算出する。テストのため両方を注入できる。
 
@@ -12,9 +13,9 @@ import Foundation
 
 /// 案C ホームの分割結果。
 struct HomeSplit {
-    /// ヒーローデッキ（残2日以下の生鮮）。daysLeft 昇順 → purchasedAt 昇順。
+    /// きょうの食べ頃（期限が今日まで＝daysLeft<=0 の生鮮）。daysLeft 昇順 → purchasedAt 昇順。
     let urgent: [FoodItem]
-    /// 今週の食材（残3〜6日の生鮮）。daysLeft 昇順。
+    /// 今週の食材（残1〜6日の生鮮）。daysLeft 昇順。
     let calm: [FoodItem]
     /// ゆとりあり（それ以外＝非生鮮 or 残7日以上の生鮮）。daysLeft 昇順。
     let plenty: [FoodItem]
@@ -55,8 +56,9 @@ enum HomeSplitter {
         // plenty: daysLeft 昇順
         plenty.sort { days($0) < days($1) }
 
-        let urgent = hero.filter { days($0) <= 2 }
-        let calm = hero.filter { days($0) > 2 }.sorted { days($0) < days($1) }
+        // きょうの食べ頃 = 期限が今日まで（daysLeft<=0・期限切れ含む）。それ以外の hero は今週の食材へ。
+        let urgent = hero.filter { days($0) <= 0 }
+        let calm = hero.filter { days($0) > 0 }.sorted { days($0) < days($1) }
 
         return HomeSplit(urgent: urgent, calm: calm, plenty: plenty, dueNow: now, dueCalendar: calendar)
     }

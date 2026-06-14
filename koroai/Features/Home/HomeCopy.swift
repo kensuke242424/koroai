@@ -138,8 +138,10 @@ enum HomeCopy {
 
     // MARK: - 「急ぎなし」カード（urgent なし・hero あり）
 
-    /// 出典: fk-home.jsx FKHomeC の no-top カード。
-    static let noUrgentTitle = "今日・明日の急ぎはありません"
+    /// urgent（きょうの食べ頃）が空＝今日まで期限の食材がないときのカード。
+    /// urgent を「今日まで（daysLeft<=0）」に変更したのに合わせ「明日」を外す
+    /// （今週の食材に「あすまで」が残りうるため・ユーザー指定 2026-06）。
+    static let noUrgentTitle = "今日の急ぎはありません"
     static let noUrgentSub = "下の食材を、ゆっくり使いきっていきましょう。"
 
     // MARK: - 「当分OK」ラベル（plenty・daysLeft>13）

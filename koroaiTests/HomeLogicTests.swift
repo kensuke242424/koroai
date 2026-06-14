@@ -60,28 +60,30 @@ struct HomeSplitTests {
         #expect(split.hasHero == false)
     }
 
-    @Test func urgentIsDaysLeqTwo_calmIsThreeToSix() throws {
+    @Test func urgentIsDueToday_calmIsOneToSix() throws {
+        // きょうの食べ頃 = daysLeft<=0（今日まで・期限切れ含む）。それ以外の hero は今週の食材。
         let context = try TestSupport.makeContext()
+        let dm1 = makeItem(context, catId: "fish", name: "dm1", daysLeft: -1, perishable: true)
         let d0 = makeItem(context, catId: "fish", name: "d0", daysLeft: 0, perishable: true)
+        let d1 = makeItem(context, catId: "fish", name: "d1", daysLeft: 1, perishable: true)
         let d2 = makeItem(context, catId: "fish", name: "d2", daysLeft: 2, perishable: true)
-        let d3 = makeItem(context, catId: "fish", name: "d3", daysLeft: 3, perishable: true)
         let d6 = makeItem(context, catId: "fish", name: "d6", daysLeft: 6, perishable: true)
-        let split = HomeSplitter.split(items: [d6, d3, d2, d0], now: now(), calendar: cal())
-        #expect(split.urgent.map(\.name) == ["d0", "d2"])  // daysLeft 昇順
-        #expect(split.calm.map(\.name) == ["d3", "d6"])
+        let split = HomeSplitter.split(items: [d6, d2, d1, d0, dm1], now: now(), calendar: cal())
+        #expect(split.urgent.map(\.name) == ["dm1", "d0"])        // daysLeft 昇順・今日まで
+        #expect(split.calm.map(\.name) == ["d1", "d2", "d6"])     // 明日以降
     }
 
     @Test func heroSortsByDaysThenPurchasedAt() throws {
         let context = try TestSupport.makeContext()
         let c = cal()
         let n = now()
-        // 同じ daysLeft=1 の2件。purchasedAt の早い方が先。
+        // 同じ daysLeft=1 の2件。purchasedAt の早い方が先（daysLeft=1 は今週の食材へ）。
         let older = makeItem(context, catId: "fish", name: "古い", daysLeft: 1, perishable: true,
                              purchasedAt: c.date(byAdding: .day, value: -3, to: n)!)
         let newer = makeItem(context, catId: "fish", name: "新しい", daysLeft: 1, perishable: true,
                              purchasedAt: c.date(byAdding: .day, value: -1, to: n)!)
         let split = HomeSplitter.split(items: [newer, older], now: n, calendar: c)
-        #expect(split.urgent.map(\.name) == ["古い", "新しい"])
+        #expect(split.calm.map(\.name) == ["古い", "新しい"])
     }
 
     @Test func plentySortsByDaysAscending() throws {
