@@ -215,10 +215,16 @@ struct AddSheet: View {
             selectInlineBar
         }
         // インラインタイトルのタップで最上部へ戻る。視覚バーは allowsHitTesting(false) の
-        // ままなので、タイトル行の高さ分だけ透明なタップ受けを重ねる（ハンドル領域は塞がない）。
+        // ままなので、透明なタップ受けを重ねる。タップ範囲は「食材をえらぶ」テキスト幅に限定し
+        //（中央寄せ）、右端のリセットボタンを覆わない（全幅にするとリセットが効かない）。
         .overlay(alignment: .top) {
             if inlineTitleProgress > 0.5 {
-                Color.clear
+                // 視覚はバー側が描く。ここは透明テキストでタップ範囲（＝タイトル幅）を作るだけ。
+                // opacity(0) はヒットテストが不安定なので、テキスト色だけ透明にする（ビューは不透明）。
+                Text("食材をえらぶ")
+                    .font(AppFont.rounded(size: 16, weight: .heavy))
+                    .foregroundStyle(.clear)
+                    .padding(.horizontal, 12)
                     .frame(height: 40)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -238,19 +244,55 @@ struct AddSheet: View {
     }
 
     /// タイトル＋説明。スクロール内容に含めて、上にスクロールすると隠れる。
+    /// かごに1品以上あるときは右上に「リセット」を浮かせる（かごを空に戻す導線）。
+    /// リセットは overlay で配置し、説明文の横幅・行数に影響させない（説明は常にフル幅1行）。
     private var selectHeader: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(copy.addTitle)
                 .font(AppFont.rounded(size: 22, weight: .heavy))
                 .foregroundStyle(tokens.text)
-            Text("カテゴリを選んでカゴへ。最後にまとめて確認します。")
+            Text("食材をタップしてカゴに入れよう")
                 .font(AppFont.rounded(size: 13.5, weight: .semibold))
                 .foregroundStyle(tokens.textSec)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .topTrailing) {
+            if model.cartCount > 0 {
+                resetButton
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
+            }
+        }
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.cartCount > 0)
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 6)
+    }
+
+    /// かごを空に戻すボタン（ヘッダー右上）。タップ領域は44pt確保しつつ視覚は右上にコンパクトに。
+    private var resetButton: some View {
+        Button {
+            resetCart()
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 12, weight: .bold))
+                Text("リセット")
+                    .font(AppFont.rounded(size: 13.5, weight: .bold))
+            }
+            .foregroundStyle(tokens.textSec)
+            .frame(minWidth: 44, minHeight: 44, alignment: .topTrailing)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("かごをリセット")
+    }
+
+    /// かごを空に戻す（タイル選択・下部トレイがアニメーションで消える）。
+    private func resetCart() {
+        guard !sheetDragging else { return }
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+            model.reset(store: store)
+        }
     }
 
     // ヘッダー（タイトル＋説明 ≈70pt）が隠れきるあたりでインラインタイトルを入れる。
@@ -262,38 +304,68 @@ struct AddSheet: View {
 
     /// インラインタイトル。ハンドル領域（高さ28・SheetContainer）まで背景を伸ばして
     /// シート上端と一体の1枚のヘッダーに見せる（ハンドルは同位置に描き直す）。
-    /// allowsHitTesting(false) なので下の SheetContainer のハンドル操作はそのまま効く。
+    /// 視覚バーは allowsHitTesting(false)（下の SheetContainer のハンドル操作を通す）。
+    /// かご1品以上のときは、その外側にタップ可能なリセットを右端へ重ねる。
     private var selectInlineBar: some View {
-        VStack(spacing: 0) {
-            // SheetContainer.handleZone と同位置（カプセル上端 ≈15.5pt）に合わせる。
-            Capsule()
-                .fill(tokens.hair)
-                .frame(width: 40, height: 5)
-                .padding(.top, 15.5)
-            Text("食材をえらぶ")
-                .font(AppFont.rounded(size: 16, weight: .heavy))
-                .foregroundStyle(tokens.text)
-                .padding(.top, 9)
-                .padding(.bottom, 10)
-        }
-        .frame(maxWidth: .infinity)
-        .background {
-            // 少しだけ透過させ、裏に回るタイルがほのかに見える馴染みを作る
-            // （確認画面の上部説明エリアと同じ印象に合わせる）。
-            UnevenRoundedRectangle(
-                topLeadingRadius: 28, bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0, topTrailingRadius: 28,
-                style: .continuous
-            )
-            .fill(tokens.bg2.opacity(0.92))
-        }
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(tokens.hair).frame(height: 1)
+        ZStack(alignment: .top) {
+            // 視覚バー（タップは下のハンドルへ通す）。
+            VStack(spacing: 0) {
+                // SheetContainer.handleZone と同位置（カプセル上端 ≈15.5pt）に合わせる。
+                Capsule()
+                    .fill(tokens.hair)
+                    .frame(width: 40, height: 5)
+                    .padding(.top, 15.5)
+                Text("食材をえらぶ")
+                    .font(AppFont.rounded(size: 16, weight: .heavy))
+                    .foregroundStyle(tokens.text)
+                    .padding(.top, 9)
+                    .padding(.bottom, 10)
+            }
+            .frame(maxWidth: .infinity)
+            .background {
+                // 少しだけ透過させ、裏に回るタイルがほのかに見える馴染みを作る
+                // （確認画面の上部説明エリアと同じ印象に合わせる）。
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 28, bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0, topTrailingRadius: 28,
+                    style: .continuous
+                )
+                .fill(tokens.bg2.opacity(0.92))
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(tokens.hair).frame(height: 1)
+            }
+            .allowsHitTesting(false)
+
+            // タップ吸収（バー本体＝タイトル行ぶん）。背後のタイルへの貫通を防ぐ。
+            // ハンドル領域（上部 ≈20.5pt）は除外＝SheetContainer のハンドル tap/drag を通す。
+            // ドラッグは panel の simultaneousGesture が拾うので detent 操作は生きる。
+            // この上に「食材をえらぶ」タップ（最上部へ）とリセットを重ねるので、その2つは効く。
+            if inlineTitleProgress > 0.5 {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 39)
+                    .contentShape(Rectangle())
+                    .onTapGesture { /* 吸収のみ（背後タイルへ貫通させない） */ }
+                    .padding(.top, 20.5)
+            }
+
+            // リセット（タップ可能・右端）。吸収レイヤーより上に置くので右端タップはリセットが勝つ。
+            // 浅いスクロール（バーが薄い）ときはヒットを切って誤爆を防ぐ。
+            if model.cartCount > 0 {
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    resetButton
+                }
+                // タイトル行（ハンドル20.5＋上余白9）に縦を合わせ、右端は content 余白22に揃える。
+                .padding(.top, 29.5)
+                .padding(.trailing, 22)
+                .allowsHitTesting(inlineTitleProgress > 0.5)
+            }
         }
         // コンテンツ領域はハンドル領域の直下から始まるので、その分上に伸ばす。
         .padding(.top, -28)
         .opacity(Double(inlineTitleProgress))
-        .allowsHitTesting(false)
     }
 
     private var categoryGrid: some View {
